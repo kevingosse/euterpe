@@ -1,0 +1,7 @@
+{
+  "name": "euterpe-overlay",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Euterpe's body: a pixel-art Clawd in a transparent, always-on-top overlay",
+  "main": "main.js"
+}

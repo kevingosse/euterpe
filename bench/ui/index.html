@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Euterpe review bench</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.38/dist/codicon.css" />
+    <link rel="stylesheet" href="/ui/bench.css" />
+    <link rel="stylesheet" href="/ui/workbench.css" />
+    <link rel="icon" href="/repo/media/icon.png" id="favicon" />
+    <script>
+        // What goes wrong in the page (and in the frames it runs), for the bench's own tests.
+        window.__benchErrors = [];
+        window.__benchError = (where, what) => { window.__benchErrors.push(`[${where}] ${what}`); if (window.__benchErrors.length > 200) { window.__benchErrors.shift(); } };
+        addEventListener("error", (e) => __benchError("page", `${e.message} @ ${e.filename}:${e.lineno}`));
+        addEventListener("unhandledrejection", (e) => __benchError("page", `unhandled: ${e.reason && (e.reason.stack || e.reason)}`));
+        const benchConsoleError = console.error;
+        console.error = (...a) => { __benchError("page", a.map((x) => (x && x.stack) || String(x)).join(" ")); benchConsoleError.apply(console, a); };
+    </script>
+</head>
+<body class="comment-off">
+    <header id="bar">
+        <button id="tour-toggle" class="bar-btn" title="Show or hide the tour (T)"><i class="codicon codicon-list-tree"></i></button>
+        <div id="where">
+            <div id="where-scenario">Euterpe review bench</div>
+            <div id="where-screen" class="muted">Pick a scenario to start</div>
+        </div>
+        <div id="run-state" class="pill">idle</div>
+        <div class="spacer"></div>
+        <button id="btn-free" class="bar-btn" title="Let the scenario go, and use its world freely: click, type, run commands (the mind answers from its controls)">Play freely</button>
+        <button id="btn-restart" class="bar-btn" title="Run this scenario again from the start (R)"><i class="codicon codicon-debug-restart"></i></button>
+        <button id="btn-next" class="bar-btn primary" title="This screen is reviewed: go on (N or Enter)" disabled>Next <i class="codicon codicon-arrow-right"></i></button>
+        <div class="bar-sep"></div>
+        <button id="btn-comment" class="bar-btn" title="Comment mode (C): point at anything, click it, and say what to change. Alt+click comments at any time."><i class="codicon codicon-comment"></i> Comment</button>
+        <button id="btn-comments" class="bar-btn" title="All comments">Comments <span id="comment-count" class="count">0</span></button>
+        <button id="btn-coverage" class="bar-btn" title="Every text in Euterpe's sources, and whether you've seen it">Coverage <span id="coverage-pct" class="count">–</span></button>
+        <button id="btn-theme" class="bar-btn" title="VS Code's dark or light theme"><i class="codicon codicon-color-mode"></i></button>
+    </header>
+    <div id="layout">
+        <aside id="tour"></aside>
+        <main id="stage">
+            <div id="desktop"></div>
+            <div id="banner" class="hidden"></div>
+        </main>
+        <aside id="side">
+            <section id="screen-card" class="card"></section>
+            <section id="screen-comments" class="card"></section>
+            <details id="mind-panel" class="card">
+                <summary>Euterpe's mind <span id="mind-badge" class="count hidden"></span></summary>
+                <div id="mind-body"></div>
+            </details>
+            <details id="log-panel" class="card">
+                <summary>Bench log</summary>
+                <pre id="bench-log"></pre>
+            </details>
+        </aside>
+    </div>
+    <div id="hilite" class="hidden"></div>
+    <div id="popover" class="hidden"></div>
+    <div id="sheet-frames" aria-hidden="true"></div>
+    <section id="view-comments" class="view hidden"></section>
+    <section id="view-coverage" class="view hidden"></section>
+    <script type="module" src="/ui/app.js"></script>
+</body>
+</html>

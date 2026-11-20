@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ws://127.0.0.1:*" />
+    <title>Euterpe</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div id="chat-panel" class="hidden pixel-frame">
+        <div class="resize-edge" data-edge="n"></div>
+        <div class="resize-edge" data-edge="w"></div>
+        <div class="resize-edge" data-edge="nw" title="Drag to resize the chat"></div>
+        <div id="chat-header">
+            <span id="chat-title">Euterpe</span>
+            <span id="chat-hint">Enter to send · Esc to close</span>
+            <button id="chat-close" title="Close (Esc)">✕</button>
+        </div>
+        <div id="chat-log"></div>
+        <div id="chat-inputrow">
+            <textarea id="chat-input" class="pixel-frame" rows="1" placeholder="Talk to Euterpe…" spellcheck="true"></textarea>
+            <button id="chat-send" class="pixel-frame" title="Send (Enter)">➤</button>
+        </div>
+    </div>
+
+    <div id="bubble" class="hidden pixel-frame">
+        <div id="bubble-content"></div>
+        <canvas id="bubble-tail" width="7" height="5"></canvas>
+    </div>
+
+    <button id="notes-badge" class="hidden pixel-frame" title="Euterpe is holding notes for you — click to hear them">
+        <span id="notes-icon"></span><span id="notes-count">0</span>
+    </button>
+
+    <canvas id="stage"></canvas>
+
+    <script src="clawd/core.js"></script>
+    <script src="clawd/glyphs.js"></script>
+    <script src="clawd/rig.js"></script>
+    <script src="clawd/body.js"></script>
+    <script src="clawd/pack.js"></script>
+    <script src="clawd/emotes.js"></script>
+    <script src="clawd/acting.js"></script>
+    <script src="clawd/director.js"></script>
+    <script src="clawd/stage.js"></script>
+    <script src="markdown.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# The package ships the bundled extension, the mind's prompts, the bundled mascots, the mascot
+# guide, the overlay's own files and the settings window's. Electron itself is downloaded on
+# first use (see src/electronRuntime.ts).
+**
+!package.json
+!README.md
+!LICENSE
+!dist/extension.js
+!mind/**
+!mascots/*.json
+!docs/mascots.md
+!media/euterpe-icons.ttf
+!media/icon.png
+!media/icon-openai.png
+!overlay/package.json
+!overlay/main.js
+!overlay/preload.js
+!overlay/render-sheet.js
+!overlay/renderer/**
+!settings/settings.js
+!settings/settings.css

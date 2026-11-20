@@ -1,0 +1,114 @@
+{
+  "format": 1,
+  "name": "Mochi",
+  "description": "A ginger tabby with stubby legs and opinions about your semicolons.",
+  "body": "a small ginger tabby cat standing on two stubby legs: a big round head with pointed ears and a cream muzzle, little paws, and a curling tail",
+  "colors": {
+    "1": "#EE9A94",
+    "2": "#F7DDBA",
+    "B": "#E9A24E",
+    "L": "#F4C27E",
+    "H": "#FBE1B4",
+    "M": "#CF8236",
+    "D": "#B56A2C"
+  },
+  "arms": {
+    "y": 16,
+    "length": 3,
+    "thickness": 3,
+    "front": [[5, -1], [18, 1]],
+    "side": [[16, 0]],
+    "back": [[5, -1], [18, 1]]
+  },
+  "legs": {
+    "width": 3,
+    "height": 3,
+    "front": [[7, 0], [14, 0]],
+    "side": [[10, 1], [14, 0]],
+    "back": [[7, 0], [14, 0]]
+  },
+  "views": {
+    "front": {
+      "rows": [
+        "....M..............M....",
+        "....LM............LM....",
+        "...L1BM..........LB1M...",
+        "..L111BM........LB111M..",
+        "..L1111BLLLLLLLLB1111M..",
+        "..LBBBBBBMBMMBMBBBBBBM..",
+        ".LBHHBBBBBBMMBBBBBBBBBM.",
+        ".LBHBBBBBBBBBBBBBBBBBBM.",
+        ".LBBBBBBBBBBBBBBBBBBBBM.",
+        ".LBBBBBBBBBBBBBBBBBBBBM.",
+        ".MMBBBBBBBBBBBBBBBBBBMM.",
+        ".LBBBBBBBB2112BBBBBBBBM.",
+        ".MMBBBBB22222222BBBBBMM.",
+        "..LBBBBB22222222BBBBBM..",
+        "...DMMBBB222222BBBMMD...",
+        ".....MMMMMMMMMMMMMD.....",
+        ".....LBBB222222BBBM.....",
+        ".....LBB22222222BBM.....",
+        ".....LBB22222222BBM...MB",
+        "......MBB222222BBM..LM..",
+        ".......DMMMMMMMMDLMMM..."
+      ],
+      "eyes": [[7.5, 9], [16.5, 9]],
+      "mouth": [12, 13],
+      "blush": [[4, 12], [20, 12]]
+    },
+    "side": {
+      "rows": [
+        "...........M............",
+        "...........LM...M.......",
+        "..........L1BM.MBM......",
+        ".........L111BMMBBM.....",
+        "........LL1111BBBBBM....",
+        ".......LBBBBBMBMBBBBM...",
+        "......LBHHBBBBBMBBBBBM..",
+        "......LBHBBBBBBBBBBBBBM.",
+        ".....LBBBBBBBBBBBBBBBBM.",
+        ".....LBBBBBBBBBBBBBBBBM.",
+        ".....MMBBBBBBBBBBBBBBBBM",
+        ".LM..LBBBBBBBBBBBBBB2221",
+        ".LM..MMBBBBBBBBBBB22222.",
+        ".LM...LBBBBBBBBBB222222.",
+        ".MM....DMMBBBBBBB22222..",
+        ".LM.......MMMMMMMMMMD...",
+        ".LB.......LBBBBBB222M...",
+        ".MM.......LBBBBB2222M...",
+        ".LBM......LBBBBB2222M...",
+        "..LBLL....MBBBBBB22M....",
+        "...MMMMMMMDMMMMMMMD....."
+      ],
+      "eyes": [[17.5, 9]],
+      "mouth": [20, 13],
+      "blush": [[16, 12]],
+      "ground": [14, 21]
+    },
+    "back": {
+      "rows": [
+        "....M..............M....",
+        "....LM............LM....",
+        "...LBBM..........LBBM...",
+        "..LBBBBM........LBBBBM..",
+        "..LBBBBBLLLLLLLLBBBBBM..",
+        "..LBBBBBBBBMMBBBBBBBBM..",
+        ".LBHHBBBBBBMMBBBBBBBBBM.",
+        ".LBHBBBMMBBBBBBMMBBBBBM.",
+        ".LBBBBBBBBBMMBBBBBBBBBM.",
+        ".LBBBBBBBBBBBBBBBBBBBBM.",
+        ".MMBBBBBBMMBBMMBBBBBBMM.",
+        ".LBBBBBBBBBBBBBBBBBBBBM.",
+        ".MMBBBBBBBBMMBBBBBBBBMM.",
+        "..LBBBBBBBBBBBBBBBBBBM..",
+        "...DMMBBBBBBBBBBBBMMD...",
+        ".....MMMMMMMMMMMMMD.....",
+        ".....LBBBBBBBBBBBBM.....",
+        ".....LBBBMMBBBMMBBM.....",
+        "LB...LBBBBBBBBBBBBM.....",
+        "..LM.LMBBBMMBBBBBM......",
+        "...MMMLDMMMMMMMMD......."
+      ]
+    }
+  }
+}

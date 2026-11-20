@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    # A run takes about a minute; a hung Electron shouldn't hold a runner for GitHub's six hours.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Package the extension
+        run: npm run package
+      # Electron's sandbox helper has to be setuid root on Linux. (The electron package fetches its
+      # binary on first use.)
+      - name: Set up Electron's sandbox (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          node -e "require('electron')"
+          sudo chown root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+      - name: Render the overlay offscreen
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}npm run screenshot
+      # The tests that need Electron skip until it's there: the bundled mascots, drawn for real, and
+      # Electron's own zip unpacked inside Electron, whose fs takes .asar files for archives.
+      - name: Run the tests that need Electron
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}node --test out/test/sheet.test.js out/test/electronRuntime.test.js
+      # The window's focus handling, on the Electron Euterpe downloads for writers (a real window:
+      # macOS is the platform nobody here can try by hand).
+      - name: Check the overlay's focus handling (macOS)
+        if: runner.os == 'macOS'
+        run: node overlay/dev/check-focus.js --download
+      - uses: actions/upload-artifact@v7
+        with:
+          name: overlay-${{ matrix.os }}
+          path: overlay/preview.png
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux'
+        with:
+          name: vsix
+          path: "*.vsix"

@@ -1,0 +1,589 @@
+/* Euterpe's settings window. VS Code's own colours and type, so it sits in any theme; Euterpe's
+   clay and notched pixel frames (the overlay's, see overlay/renderer/style.css) mark what's
+   chosen, and the mascots get a little stage of their own. */
+
+:root {
+    --accent: #D97757;                 /* Euterpe's clay */
+    --accent-text: #E08A6C;            /* clay as small text: readable on a dark editor */
+    --accent-strong: #A84D33;          /* behind light text: 5:1 against cream */
+    --on-accent: #FFF5E2;
+    --fg: var(--vscode-foreground);
+    --muted: var(--vscode-descriptionForeground);
+    --bg: var(--vscode-editor-background);
+    --card: color-mix(in srgb, var(--vscode-foreground) 4%, transparent);
+    --card-hover: color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+    --line: color-mix(in srgb, var(--vscode-foreground) 17%, transparent);
+    --focus: var(--vscode-focusBorder);
+    --problem: var(--vscode-errorForeground);
+    --warn: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+body.vscode-light { --accent-text: #A84D33; }
+
+/* A mind that isn't on Claude wears ink blue (Inky's), not Claude's clay. */
+body.provider-openai {
+    --accent: #4E73D2;
+    --accent-text: #7C9CEB;
+    --accent-strong: #3555B0;          /* 6:1 against cream */
+}
+body.vscode-light.provider-openai { --accent-text: #2E4893; }
+
+body.vscode-high-contrast, body.vscode-high-contrast-light {
+    --accent-text: var(--vscode-contrastActiveBorder, var(--vscode-foreground));
+    --accent: var(--vscode-contrastActiveBorder, var(--vscode-focusBorder));
+    --accent-strong: var(--vscode-contrastActiveBorder, var(--vscode-focusBorder));
+    --on-accent: var(--vscode-editor-background);
+    --line: var(--vscode-contrastBorder, var(--vscode-foreground));
+    --card: transparent;
+    --chosen: transparent;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    /* mixed here, not at :root: the provider's accent is the body's */
+    --chosen: color-mix(in srgb, var(--accent) 13%, transparent);
+    --stage: color-mix(in srgb, var(--vscode-editor-background) 90%, var(--accent) 10%);
+    margin: 0;
+    padding: 0;
+    color: var(--fg);
+    background: var(--bg);
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    line-height: 1.5;
+}
+
+#app {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 28px 32px 56px;
+}
+
+p { margin: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.problem { color: var(--problem); }
+
+/* ---------- pixel frames ---------- */
+
+/* Four offset shadows: a frame outside the box with its corners notched, like the overlay's. */
+.card, .stage, .state, .switch-track {
+    --frame: var(--line);
+    --w: 1px;
+    box-shadow:
+        0 calc(-1 * var(--w)) 0 0 var(--frame),
+        0 var(--w) 0 0 var(--frame),
+        calc(-1 * var(--w)) 0 0 0 var(--frame),
+        var(--w) 0 0 0 var(--frame);
+}
+
+/* ---------- header ---------- */
+
+.top {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.mark {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    image-rendering: pixelated;
+}
+.title h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.2;
+}
+.title p { margin-top: 3px; }
+.state {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+    background: var(--card);
+}
+.state .dot {
+    width: 8px;
+    height: 8px;
+    background: var(--muted);
+}
+.state-active { --frame: var(--accent); }
+.state-active .dot { background: var(--accent); }
+.state-starting .dot { background: var(--accent); animation: blink 1s steps(2, jump-none) infinite; }
+.state-untrusted .dot { background: var(--warn); }
+@keyframes blink { 50% { opacity: 0.2; } }
+
+/* ---------- what the mind runs on ---------- */
+
+.provider {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    margin-top: 22px;
+}
+.provider-label {
+    color: var(--accent-text);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+.segmented-big button { padding: 6px 18px; font-weight: 600; }
+.provider-desc { flex: 1 1 280px; }
+
+/* ---------- the section links ---------- */
+
+.toc {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin: 20px -10px 0;
+    padding: 8px 10px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+}
+.toc a {
+    padding: 2px 10px;
+    color: var(--muted);
+    text-decoration: none;
+}
+.toc a:hover { color: var(--fg); background: var(--card-hover); }
+.toc a.is-here { color: var(--fg); box-shadow: inset 0 -2px 0 var(--accent); }
+.toc a:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+
+.banner, .notice {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 14px;
+}
+.banner {
+    margin-top: 18px;
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    box-shadow: inset 3px 0 0 var(--warn);
+}
+.banner p, .notice p { flex: 1; }
+.notice {
+    margin-bottom: 16px;
+    background: var(--chosen);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+.notice.is-problem {
+    background: color-mix(in srgb, var(--problem) 10%, transparent);
+    box-shadow: inset 3px 0 0 var(--problem);
+}
+
+/* ---------- sections ---------- */
+
+.section {
+    padding: 30px 0 6px;
+    scroll-margin-top: 44px;
+}
+.section + .section { border-top: 1px solid var(--line); }
+.section.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { from { background: var(--chosen); } to { background: transparent; } }
+
+.section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+.eyebrow {
+    margin-bottom: 2px;
+    color: var(--accent-text);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+.lede {
+    max-width: 64ch;
+    margin-top: 4px;
+}
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+    padding-top: 2px;
+}
+.chip {
+    padding: 0 8px;
+    font-size: 11px;
+    font-weight: normal;
+    color: var(--muted);
+    white-space: nowrap;
+    background: var(--card);
+    box-shadow: 0 0 0 1px var(--line);
+}
+.chip-now {
+    color: var(--fg);
+    background: var(--chosen);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.chip-ws {
+    color: var(--fg);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 70%, transparent);
+}
+
+.field + .field { margin-top: 24px; }
+.field-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+.field .small { margin-top: 8px; }
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    margin-top: 18px;
+}
+
+/* ---------- controls ---------- */
+
+.btn {
+    padding: 4px 12px;
+    font: inherit;
+    color: var(--vscode-button-secondaryForeground);
+    background: var(--vscode-button-secondaryBackground);
+    border: 1px solid var(--vscode-button-border, transparent);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
+.btn:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
+
+.link {
+    padding: 0;
+    font: inherit;
+    color: var(--vscode-textLink-foreground);
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+.link:hover { color: var(--vscode-textLink-activeForeground); text-decoration: underline; }
+.link:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
+
+input[type="text"] {
+    min-width: 0;
+    padding: 4px 8px;
+    font: inherit;
+    color: var(--vscode-input-foreground);
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, var(--line));
+}
+input[type="text"]:focus { outline: 1px solid var(--focus); outline-offset: -1px; border-color: var(--focus); }
+input::placeholder { color: var(--vscode-input-placeholderForeground); }
+
+.segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    box-shadow: 0 0 0 1px var(--line);
+}
+.segmented button {
+    padding: 4px 13px;
+    font: inherit;
+    color: var(--fg);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+.segmented button + button { box-shadow: inset 1px 0 0 var(--line); }
+.segmented button:hover { background: var(--card-hover); }
+.segmented button[aria-pressed="true"] {
+    color: var(--on-accent);
+    background: var(--accent-strong);
+    box-shadow: none;
+}
+.segmented button:focus-visible { outline: 1px solid var(--focus); outline-offset: 1px; position: relative; }
+
+.switch {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+}
+.switch input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+.switch-track {
+    --w: 2px;
+    position: relative;
+    flex: none;
+    width: 30px;
+    height: 16px;
+    margin: 3px 2px 0;
+    background: var(--card-hover);
+}
+.switch-track::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 10px;
+    height: 10px;
+    background: var(--muted);
+    transition: transform 0.12s steps(3, end);
+}
+.switch input:checked + .switch-track { --frame: var(--accent-strong); background: var(--accent-strong); }
+.switch input:checked + .switch-track::after { background: var(--on-accent); transform: translateX(14px); }
+.switch input:focus-visible + .switch-track { outline: 1px solid var(--focus); outline-offset: 4px; }
+.switch-text { display: flex; flex-direction: column; gap: 2px; }
+.switch-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+/* ---------- cards ---------- */
+
+.grid { display: grid; gap: 16px; }
+.grid-personas { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.grid-choices { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.grid-mascots { grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); }
+
+.card {
+    display: flex;
+    flex-direction: column;
+    background: var(--card);
+}
+.card:hover { background: var(--card-hover); }
+.card.is-current {
+    --frame: var(--accent);
+    --w: 3px;
+    background: var(--chosen);
+}
+.card-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px 14px;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+.card-main:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+.card-title { font-weight: 600; }
+.card-desc { color: var(--muted); font-size: 12px; }
+.card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    padding: 0 14px 11px;
+    font-size: 12px;
+}
+.badge {
+    padding: 0 5px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    vertical-align: 1px;
+    color: var(--vscode-badge-foreground);
+    background: var(--vscode-badge-background);
+}
+
+.card.persona.is-open { grid-column: 1 / -1; }
+.persona-text {
+    max-height: 300px;
+    margin: 0 14px 14px;
+    padding: 10px 14px;
+    overflow: auto;
+    font-size: 12.5px;
+    background: var(--bg);
+    box-shadow: 0 0 0 1px var(--line);
+}
+.persona-text p, .persona-text ul, .persona-text ol, .persona-text blockquote { margin: 0 0 8px; }
+.persona-text > :last-child { margin-bottom: 0; }
+.persona-text ul, .persona-text ol { padding-left: 20px; }
+.persona-text code { font-family: var(--vscode-editor-font-family); }
+.persona-text pre { white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
+
+.card.mascot .card-main {
+    align-items: center;
+    gap: 6px;
+    padding: 10px 8px 10px;
+    text-align: center;
+}
+.card.is-broken .card-main { justify-content: center; cursor: not-allowed; }
+.card.is-broken .card-title { color: var(--muted); }
+.card.is-broken .card-desc {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+}
+
+/* ---------- the stage ---------- */
+
+.puppet-slot { display: block; line-height: 0; }
+.puppet {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    image-rendering: pixelated;
+}
+.stage-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 22px 28px;
+    align-items: flex-start;
+    margin-bottom: 24px;
+}
+.stage {
+    position: relative;
+    flex: 0 1 auto;
+    display: flex;
+    justify-content: center;
+    min-width: 236px;
+    max-width: 100%;
+    margin: 3px;
+    padding: 6px 18px 18px;
+    background: var(--stage);
+}
+.stage .puppet { cursor: pointer; }
+.stage-mood {
+    position: absolute;
+    left: 10px;
+    bottom: 3px;
+    font: 11px var(--vscode-editor-font-family);
+    opacity: 0.8;
+}
+.stage-info {
+    flex: 1 1 280px;
+    min-width: 240px;
+    padding-top: 4px;
+}
+.stage-info h3 {
+    margin: 0 0 4px;
+    font-size: 16px;
+    font-weight: 600;
+}
+.stage-info > p + p { margin-top: 6px; }
+.body-line { font-style: italic; }
+.stage-info .field { margin: 18px 0 14px; }
+
+/* ---------- mind ---------- */
+
+.other-model {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    margin-top: 14px;
+}
+.other-model label { color: var(--muted); }
+.other-model input { width: 230px; font-family: var(--vscode-editor-font-family); font-size: 12px; }
+
+.grid-presets { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+.api-url { margin-top: 12px; }
+.api-url + .path-hint, .grid-presets + .path-hint { margin-top: 8px; }
+.key-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+}
+.key-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--muted);
+}
+.key-set, .key-local { background: var(--accent); }
+.key-missing { background: var(--warn); }
+
+/* ---------- setup ---------- */
+
+.setup > summary {
+    position: relative;
+    padding-right: 32px;
+    list-style: none;
+    cursor: pointer;
+}
+.setup > summary::-webkit-details-marker { display: none; }
+.setup > summary::after {
+    content: "";
+    position: absolute;
+    top: 24px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid var(--muted);
+    border-bottom: 2px solid var(--muted);
+    transform: rotate(45deg);
+}
+.setup[open] > summary::after { top: 28px; transform: rotate(-135deg); }
+.setup > summary:hover::after { border-color: var(--fg); }
+.setup > summary:focus-visible { outline: 1px solid var(--focus); outline-offset: 6px; }
+.setup-body { margin-top: 22px; }
+.path-row + .path-row { margin-top: 20px; }
+.path-row .field-label { margin-bottom: 0; }
+.path-row > p { margin: 1px 0 6px; }
+.path-input { display: flex; gap: 8px; }
+.path-input input {
+    flex: 1;
+    font-family: var(--vscode-editor-font-family);
+    font-size: 12px;
+}
+.path-hint, .path-row .problem {
+    margin-top: 5px;
+    font-family: var(--vscode-editor-font-family);
+    overflow-wrap: anywhere;
+}
+.setup-body > .field { margin-top: 26px; }
+
+/* ---------- footer ---------- */
+
+.foot {
+    margin-top: 40px;
+    padding-top: 16px;
+    font-size: 12px;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+}
+.foot p + p { margin-top: 4px; }
+
+@media (max-width: 600px) {
+    #app { padding: 18px 16px 40px; }
+    .top { flex-wrap: wrap; }
+    .state { margin-left: 60px; }
+    .section-head { flex-direction: column; }
+    .chips { justify-content: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::after { animation: none !important; transition: none !important; }
+}

@@ -1,0 +1,449 @@
+{
+  "name": "euterpe",
+  "displayName": "Euterpe",
+  "description": "An AI pair-writing companion — a presence beside you while you write.",
+  "version": "0.2.0",
+  "publisher": "kevingosse",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kevingosse/euterpe"
+  },
+  "bugs": {
+    "url": "https://github.com/kevingosse/euterpe/issues"
+  },
+  "homepage": "https://github.com/kevingosse/euterpe#readme",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "icon": "media/icon.png",
+  "preview": true,
+  "galleryBanner": {
+    "color": "#2B2233",
+    "theme": "dark"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Other"
+  ],
+  "keywords": [
+    "writing",
+    "writing companion",
+    "pair writing",
+    "prose",
+    "blog",
+    "markdown",
+    "claude",
+    "claude code",
+    "desktop pet",
+    "mascot"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onWebviewPanel:euterpe.settings"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Euterpe's mind is an AI agent that reads the folder's files, and can write files and run commands without asking. In Restricted Mode, its settings, personas and mascots are there, but a writing session waits until you trust the folder."
+    }
+  },
+  "contributes": {
+    "icons": {
+      "euterpe-idle": {
+        "description": "Euterpe, before a session",
+        "default": {
+          "fontPath": "./media/euterpe-icons.ttf",
+          "fontCharacter": "\\E001"
+        }
+      },
+      "euterpe-active": {
+        "description": "Euterpe, during a session",
+        "default": {
+          "fontPath": "./media/euterpe-icons.ttf",
+          "fontCharacter": "\\E002"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "euterpe.startSession",
+        "title": "Start Writing Session",
+        "category": "Euterpe",
+        "icon": "$(euterpe-idle)"
+      },
+      {
+        "command": "euterpe.endSession",
+        "title": "End Writing Session",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.talk",
+        "title": "Talk to Euterpe",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.openMemory",
+        "title": "Open Euterpe's Memory",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.showLog",
+        "title": "Show Log",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.checkSetup",
+        "title": "Check Setup",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.openSettings",
+        "title": "Open Settings",
+        "category": "Euterpe",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "euterpe.choosePersona",
+        "title": "Choose Persona",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.newPersona",
+        "title": "New Persona",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.installPersona",
+        "title": "Install Persona…",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.chooseMascot",
+        "title": "Choose Mascot",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.previewMascot",
+        "title": "Preview Mascot",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.installMascot",
+        "title": "Install Mascot…",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.chooseModel",
+        "title": "Choose Model",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.setApiKey",
+        "title": "Set API Key…",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.signIn",
+        "title": "Sign In with ChatGPT…",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.signOut",
+        "title": "Sign Out of ChatGPT",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.toggleSession",
+        "title": "Toggle Writing Session",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.sessionMenu",
+        "title": "Session Menu",
+        "category": "Euterpe"
+      },
+      {
+        "command": "euterpe.acceptEdit",
+        "title": "Accept Euterpe's Edit",
+        "category": "Euterpe",
+        "icon": "$(check)"
+      },
+      {
+        "command": "euterpe.rejectEdit",
+        "title": "Reject Euterpe's Edit",
+        "category": "Euterpe",
+        "icon": "$(discard)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "euterpe.acceptEdit",
+          "when": "resourceScheme == euterpe-proposal",
+          "group": "navigation@1"
+        },
+        {
+          "command": "euterpe.rejectEdit",
+          "when": "resourceScheme == euterpe-proposal",
+          "group": "navigation@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "euterpe.endSession",
+          "when": "euterpe.sessionActive"
+        },
+        {
+          "command": "euterpe.acceptEdit",
+          "when": "euterpe.editPending"
+        },
+        {
+          "command": "euterpe.rejectEdit",
+          "when": "euterpe.editPending"
+        },
+        {
+          "command": "euterpe.toggleSession",
+          "when": "false"
+        },
+        {
+          "command": "euterpe.sessionMenu",
+          "when": "false"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "euterpe.talk",
+        "key": "ctrl+k ctrl+e",
+        "mac": "cmd+k cmd+e",
+        "when": "!inKeybindings"
+      }
+    ],
+    "configuration": [
+      {
+        "id": "euterpe",
+        "title": "Euterpe",
+        "order": 1,
+        "properties": {
+          "euterpe.persona": {
+            "type": "string",
+            "default": "cheeky",
+            "order": 1,
+            "markdownDescription": "Who Euterpe is: `cheeky`, `warm`, `editor`, `coach`, `drill-sergeant`, `fan`, or one of your own (a Markdown file in the `personas` folder of Euterpe's home). [Choose a persona](command:euterpe.choosePersona), or read them all in [Euterpe's settings](command:euterpe.openSettings?%5B%22persona%22%5D). Takes effect at the next session."
+          },
+          "euterpe.mascot": {
+            "type": "string",
+            "default": "clawd",
+            "order": 2,
+            "markdownDescription": "The body Euterpe wears on screen: `clawd`, `boo`, `mochi`, `inky`, `clippy`, or one of your own (a mascot file in the `mascots` folder of Euterpe's home). [Choose a mascot](command:euterpe.chooseMascot), or watch them all move in [Euterpe's settings](command:euterpe.openSettings?%5B%22mascot%22%5D). Changes at once during a session."
+          },
+          "euterpe.avatarScale": {
+            "type": "integer",
+            "default": 4,
+            "order": 3,
+            "enum": [
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "enumItemLabels": [
+              "Small (2)",
+              "Quiet (3)",
+              "Standard (4)",
+              "Large (5)",
+              "Largest (6)"
+            ],
+            "markdownDescription": "How big Euterpe is on screen: each pixel of its art becomes N × N pixels. Takes effect at the next session."
+          }
+        }
+      },
+      {
+        "id": "euterpe-mind",
+        "title": "Mind",
+        "order": 2,
+        "properties": {
+          "euterpe.provider": {
+            "type": "string",
+            "default": "claude",
+            "order": 1,
+            "enum": [
+              "claude",
+              "openai"
+            ],
+            "enumItemLabels": [
+              "Claude",
+              "OpenAI and others"
+            ],
+            "enumDescriptions": [
+              "Claude, through Claude Code, on your Claude login (a subscription or an API key)",
+              "Your ChatGPT plan (sign in with ChatGPT), OpenAI's API, or any OpenAI-compatible one (OpenRouter, a local Ollama or LM Studio…) with your own key"
+            ],
+            "markdownDescription": "What Euterpe's mind runs on: **Claude**, through Claude Code and your Claude login, or **OpenAI and others**: your ChatGPT plan ([Sign In with ChatGPT](command:euterpe.signIn)), OpenAI's API, or any OpenAI-compatible one with your own key (`#euterpe.openaiBaseUrl#`, [Set API Key](command:euterpe.setApiKey)). Clawd, Claude Code's mascot, only comes with Claude. Takes effect at the next session. [Euterpe's settings](command:euterpe.openSettings?%5B%22mind%22%5D) set it all up."
+          },
+          "euterpe.model": {
+            "type": "string",
+            "default": "",
+            "order": 2,
+            "markdownDescription": "The Claude model Euterpe's mind thinks with on **Claude** (`#euterpe.provider#`): `haiku` (the quickest and cheapest), `sonnet` (the default when empty), `opus` (more thoughtful, and pricier), `fable` (the most thoughtful, and by far the most expensive), each Claude Code's latest of its kind, or any model Claude Code knows (`claude --model`). [Choose a model](command:euterpe.chooseModel): it also switches during a session."
+          },
+          "euterpe.openaiModel": {
+            "type": "string",
+            "default": "",
+            "order": 3,
+            "markdownDescription": "The model Euterpe's mind thinks with on **OpenAI and others** (`#euterpe.provider#`). On your ChatGPT plan: one it offers, like `gpt-5.6-sol` (empty: Euterpe's pick, the plan's Sol rather than its first, the frontier model a plan allows least of). On OpenAI's API: `gpt-6.1-sol` (the default when empty: nearly as thoughtful as Astra, quicker and much cheaper), `gpt-6-astra` (the best writer, at five times the price), `gpt-6-luna` (the quickest and cheapest), or any model the API knows. Elsewhere, the model as your provider names it (`meta-llama/llama-3.3-70b-instruct`, `qwen3-coder:30b`…): another provider has no default. [Choose a model](command:euterpe.chooseModel): it also switches during a session."
+          },
+          "euterpe.openaiBaseUrl": {
+            "type": "string",
+            "default": "",
+            "scope": "machine",
+            "order": 4,
+            "markdownDescription": "The OpenAI-compatible API Euterpe's mind uses with **OpenAI and others** (`#euterpe.provider#`). Empty: your ChatGPT plan, with no key: [Sign In with ChatGPT](command:euterpe.signIn). Else its base URL, like `https://api.openai.com/v1` (OpenAI's API), `https://openrouter.ai/api/v1` or `http://localhost:11434/v1` (Ollama), whose API key is kept in VS Code's secret storage, for this address only: [Set API Key](command:euterpe.setApiKey). User settings only: a workspace can't send your key, or your writing, elsewhere."
+          },
+          "euterpe.effort": {
+            "type": "string",
+            "default": "low",
+            "order": 5,
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "enumItemLabels": [
+              "Low",
+              "Medium",
+              "High",
+              "Extra high"
+            ],
+            "enumDescriptions": [
+              "The snappiest replies, and the cheapest looks",
+              "",
+              "",
+              "The slowest, most deliberate replies"
+            ],
+            "markdownDescription": "How hard Euterpe thinks before each turn (`claude --effort`, or the API's reasoning effort). Lower: snappier chat replies, and cheaper looks. Not every model takes every level: Euterpe moves to the nearest one it does. Takes effect at the next session."
+          }
+        }
+      },
+      {
+        "id": "euterpe-reading",
+        "title": "Reading Along",
+        "order": 3,
+        "properties": {
+          "euterpe.attention": {
+            "type": "string",
+            "default": "close",
+            "order": 1,
+            "enum": [
+              "close",
+              "relaxed",
+              "light"
+            ],
+            "enumItemLabels": [
+              "Close",
+              "Relaxed",
+              "Light"
+            ],
+            "enumDescriptions": [
+              "Reads right behind you: a look at every pause, and at least every 15 s while you type. A typo reaches the notes seconds after you make it.",
+              "A look when you stop for a few seconds, and at least every minute: roughly a third of the looks, and a shorter memory of the session.",
+              "A look at longer pauses, and every few minutes: the fewest, cheapest looks. Notes arrive a paragraph later."
+            ],
+            "markdownDescription": "How closely Euterpe reads along. Each look is a short turn on your Claude login (mostly served from the prompt cache), so fewer looks cost less of your usage. Takes effect at the next session."
+          },
+          "euterpe.followActiveEditor": {
+            "type": "boolean",
+            "default": true,
+            "order": 2,
+            "description": "Follow you to whatever document you switch to (after a couple of seconds there). Off: Euterpe stays with the document the session started on."
+          }
+        }
+      },
+      {
+        "id": "euterpe-setup",
+        "title": "Setup",
+        "order": 4,
+        "properties": {
+          "euterpe.homeDir": {
+            "type": "string",
+            "default": "",
+            "scope": "machine",
+            "order": 1,
+            "markdownDescription": "Euterpe's home folder: its memory, your personas and mascots, and the working directory of its mind. Empty: `~/.euterpe`. Point it at a synced folder to share Euterpe's memory between machines. User settings only."
+          },
+          "euterpe.claudeConfigDir": {
+            "type": "string",
+            "default": "",
+            "scope": "machine",
+            "order": 2,
+            "markdownDescription": "The Claude Code config folder Euterpe's mind uses (it sets `CLAUDE_CONFIG_DIR`): which login pays for it (a subscription or an API key), its settings and its session history. Empty: whatever VS Code's environment has, usually `~/.claude`. Set it when you keep several Claude Code setups, such as a personal subscription and a work API key. User settings only."
+          },
+          "euterpe.claudePath": {
+            "type": "string",
+            "default": "",
+            "scope": "machine",
+            "order": 3,
+            "markdownDescription": "The `claude` executable. Empty: found automatically on PATH, then where the native installer, Homebrew, WinGet and npm put it, then inside the Claude Code VS Code extension. User settings only: a workspace can't point it elsewhere."
+          },
+          "euterpe.electronPath": {
+            "type": "string",
+            "default": "",
+            "scope": "machine",
+            "order": 4,
+            "markdownDescription": "An Electron executable for Euterpe's avatar window, for machines that can't download it (offline, managed). Empty: Euterpe downloads Electron 44 once, into its own storage. User settings only."
+          },
+          "euterpe.personaFile": {
+            "type": "string",
+            "default": "",
+            "scope": "machine",
+            "order": 5,
+            "markdownDescription": "A persona Markdown file anywhere on disk, instead of `#euterpe.persona#`. User settings only: the persona becomes part of the instructions of an agent that runs commands without asking, so a workspace can't set it."
+          },
+          "euterpe.debugMind": {
+            "type": "boolean",
+            "default": false,
+            "order": 6,
+            "markdownDescription": "Debug the mind: an **Euterpe Mind** terminal shows a live, readable transcript (perceptions, replies, tool calls, each turn's cache and token usage; type into it to talk to Euterpe), and the raw stream-json traffic goes to the Euterpe log."
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./ && npm run bundle",
+    "bundle": "esbuild src/extension.ts --bundle --platform=node --target=node20 --format=cjs --external:vscode --external:original-fs --external:bufferutil --external:utf-8-validate --sourcemap --outfile=dist/extension.js",
+    "watch": "npm run bundle -- --watch",
+    "test": "tsc -p ./ && node --test \"out/test/**/*.test.js\"",
+    "vscode:prepublish": "tsc -p ./ && npm run bundle -- --minify",
+    "package": "vsce package --no-dependencies",
+    "demo": "electron overlay --demo",
+    "sheet": "electron overlay/render-sheet.js",
+    "screenshot": "electron overlay --screenshot=overlay/preview.png --screenshot-delay=6500",
+    "icons": "node media/build-icons.js"
+  },
+  "dependencies": {
+    "openai": "^6.49.0",
+    "ws": "^8.18.0",
+    "yauzl": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.90.0",
+    "@types/ws": "^8.5.10",
+    "@types/yauzl": "^2.10.3",
+    "@vscode/vsce": "^4.0.0",
+    "electron": "44.4.5",
+    "esbuild": "^0.28.2",
+    "svg2ttf": "^6.1.0",
+    "typescript": "^5.5.0"
+  }
+}

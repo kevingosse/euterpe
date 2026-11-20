@@ -1,0 +1,120 @@
+{
+  "format": 1,
+  "name": "Inky",
+  "description": "A drop of fountain-pen ink on stubby legs. Leaves no stains, mostly.",
+  "body": "a drop of royal-blue fountain-pen ink with a glossy shine, a pointed tip on top and stubby legs",
+  "colors": {
+    "B": "#4E73D2",
+    "L": "#7194E4",
+    "H": "#D6E3FA",
+    "M": "#3C5DB8",
+    "D": "#2E4893"
+  },
+  "arms": {
+    "y": 15,
+    "length": 4,
+    "thickness": 3,
+    "front": [[0, -1], [21, 1]],
+    "side": [[12, 0]],
+    "back": [[0, -1], [21, 1]]
+  },
+  "legs": {
+    "width": 3,
+    "height": 3,
+    "front": [[6, 0], [13, 0]],
+    "side": [[5, 1], [9, 0]],
+    "back": [[6, 0], [13, 0]]
+  },
+  "views": {
+    "front": {
+      "rows": [
+        "......................",
+        "..........LM..........",
+        ".........LBBM.........",
+        "........LBBBBM........",
+        ".......LBBBBBBM.......",
+        ".......LBBBBBBM.......",
+        "......LBBBBBBBBM......",
+        ".....LBBHBBBBBBBM.....",
+        "....LBBBBBBBBBBBBM....",
+        "...LBBHBBBBBBBBBBBM...",
+        "..LBBHBBBBBBBBBBBBBM..",
+        ".LBBBHBBBBBBBBBBBBBBM.",
+        ".LBBHBBBBBBBBBBBBBBBM.",
+        "LBBBHBBBBBBBBBBBBBBBBM",
+        "LBBBHBBBBBBBBBBBBBBBBM",
+        "DBBBBBBBBBBBBBBBBBBBBD",
+        ".MBBBBBBBBBBBBBBBBBBM.",
+        ".DBBBBBBBBBBBBBBBBBBD.",
+        "..MBBBBBBBBBBBBBBBBM..",
+        "..DMBBBBBBBBBBBBBBMD..",
+        "...DMMBBBBBBBBBBMMD...",
+        "....DDMMBBBBBBMMDD....",
+        "......DDMMMMMMDD......",
+        "........DDDDDD........"
+      ],
+      "eyes": [[7.5, 14], [14.5, 14]],
+      "mouth": [11, 18],
+      "blush": [[5, 17], [17, 17]]
+    },
+    "side": {
+      "rows": [
+        "..................",
+        "......M...........",
+        ".....LBM..........",
+        ".....LBBM.........",
+        ".....LBBBM........",
+        ".....LBBBBM.......",
+        "....LBBBBBBM......",
+        "....LBBBBBBM......",
+        "....LBHBBBBBM.....",
+        "...LBBBBBBBBBM....",
+        "...LHBBBBBBBBBM...",
+        "..LBHBBBBBBBBBBM..",
+        "..LHBBBBBBBBBBBM..",
+        ".LBHBBBBBBBBBBBBM.",
+        "LBBBBBBBBBBBBBBBBM",
+        "LBBBBBBBBBBBBBBBBM",
+        "MBBBBBBBBBBBBBBBBM",
+        "DBBBBBBBBBBBBBBBBD",
+        ".MBBBBBBBBBBBBBBM.",
+        ".DMBBBBBBBBBBBBMD.",
+        "..DMBBBBBBBBBBMD..",
+        "...DMMBBBBBBMMD...",
+        "....DDMMMMMMDD....",
+        "......DDDDDD......"
+      ],
+      "eyes": [[13.5, 14]],
+      "mouth": [14, 18],
+      "blush": [[11.5, 17]]
+    },
+    "back": {
+      "rows": [
+        "......................",
+        "..........ML..........",
+        ".........MBBL.........",
+        "........MBBBBL........",
+        ".......MBBBBBBL.......",
+        ".......MBBBBBBL.......",
+        "......MBBBBBBBBL......",
+        ".....MBBBBBBBBBBL.....",
+        "....MBBBBBBBBBBBBL....",
+        "...MBBBBBBBBBBBLBBL...",
+        "..MBBBBBBBBBBBBBLBBL..",
+        ".MBBBBBBBBBBBBBBLBBBL.",
+        ".MBBBBBBBBBBBBBBBLBBL.",
+        "MBBBBBBBBBBBBBBBBBBBBL",
+        "MBBBBBBBBBBBBBBBBBBBBL",
+        "DBBBBBBBBBBBBBBBBBBBBD",
+        ".MBBBBBBBBBBBBBBBBBBM.",
+        ".DBBBBBBBBBBBBBBBBBBD.",
+        "..MBBBBBBBBBBBBBBBBM..",
+        "..DMBBBBBBBBBBBBBBMD..",
+        "...DMMBBBBBBBBBBMMD...",
+        "....DDMMBBBBBBMMDD....",
+        "......DDMMMMMMDD......",
+        "........DDDDDD........"
+      ]
+    }
+  }
+}

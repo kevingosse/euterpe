@@ -1,0 +1,333 @@
+/* Euterpe's body. Warm pixel-art frames around readable text: the boxes use the
+   notched-corner trick (four offset box-shadows) so they sit with Clawd's sprite,
+   while the words stay in a comfortable UI font. */
+
+:root {
+    --ink: #2B2233;
+    --ink-2: #372c42;
+    --ink-3: #45384f;
+    --cream: #FFF5E2;
+    --paper: #F3EBDC;
+    --clay: #D97757;
+    --clay-lt: #F2A283;
+    --clay-dk: #A84D33;
+    /* The chat's colour: Claude's clay, or ink blue for a mind on another provider (theme-openai). */
+    --accent: var(--clay);
+    --accent-lt: var(--clay-lt);
+    --accent-dk: var(--clay-dk);
+    --accent-user: #6b4135;     /* the writer's messages */
+    --muted: #b7a9c2;
+    --rose: #E27A92;
+    --px: 3px;                 /* frame thickness; set from the avatar scale */
+    --ui-font: "Segoe UI", system-ui, sans-serif;
+    --mono-font: "Cascadia Code", Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
+}
+
+.theme-openai {
+    --accent: #4E73D2;          /* Inky's ink */
+    --accent-lt: #8AA8F0;
+    --accent-dk: #2E4893;
+    --accent-user: #2F3F6B;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+    font-family: var(--ui-font);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- the stage ---------- */
+
+/* Under the UI, and transparent to the mouse: app.js hit-tests Clawd's own pixels, so the
+   canvas's empty area never blocks the bubble, the badge or the chat. */
+#stage {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 0;
+    pointer-events: none;
+    image-rendering: pixelated;
+}
+#chat-panel, #bubble, #notes-badge { z-index: 1; }
+
+/* ---------- pixel frames ---------- */
+
+.pixel-frame {
+    box-shadow:
+        0 calc(-1 * var(--px)) 0 0 var(--frame, var(--ink)),
+        0 var(--px) 0 0 var(--frame, var(--ink)),
+        calc(-1 * var(--px)) 0 0 0 var(--frame, var(--ink)),
+        var(--px) 0 0 0 var(--frame, var(--ink)),
+        0 calc(3 * var(--px)) 0 0 rgba(20, 12, 30, 0.28);
+}
+
+/* ---------- speech bubble ---------- */
+
+#bubble {
+    position: absolute;
+    max-width: 300px;
+    min-width: 60px;
+    background: var(--cream);
+    color: var(--ink);
+    padding: 9px 12px 10px;
+    font-size: 13.5px;
+    line-height: 1.45;
+    cursor: pointer;
+    transform-origin: bottom right;
+    animation: bubble-in 0.18s steps(3, end);
+    --frame: var(--ink);
+}
+#bubble.leaving { animation: bubble-out 0.2s steps(3, end) forwards; }
+@keyframes bubble-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.92); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes bubble-out {
+    to { opacity: 0; transform: translateY(6px) scale(0.95); }
+}
+#bubble-tail {
+    position: absolute;
+    top: 100%;                 /* row 0 lands on the frame's bottom edge and opens it */
+    width: calc(7 * var(--px));
+    height: calc(5 * var(--px));
+    image-rendering: pixelated;
+}
+#bubble-content {
+    overflow-wrap: break-word;
+    max-height: 340px;          /* long answers scroll; hover the bubble to scroll it */
+    overflow-y: auto;
+    user-select: text;
+}
+#bubble-content::-webkit-scrollbar { width: 5px; }
+#bubble-content::-webkit-scrollbar-thumb { background: rgba(43, 34, 51, 0.35); }
+#bubble-content p + p, #bubble-content p + pre, #bubble-content pre + p { margin-top: 6px; }
+#bubble-content .ghost { visibility: hidden; }
+
+/* ---------- notes badge ---------- */
+
+#notes-badge {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px 2px 4px;
+    border: none;
+    background: #FFE27A;
+    color: var(--ink);
+    font: 700 12px var(--ui-font);
+    cursor: pointer;
+    --px: 2px;
+    animation: bubble-in 0.2s steps(3, end);
+}
+#notes-badge:hover { background: #fff0a8; }
+#notes-icon {
+    width: 10px;
+    height: 12px;
+    background:
+        linear-gradient(var(--ink), var(--ink)) 2px 3px / 6px 1px no-repeat,
+        linear-gradient(var(--ink), var(--ink)) 2px 6px / 6px 1px no-repeat,
+        linear-gradient(var(--ink), var(--ink)) 2px 9px / 4px 1px no-repeat,
+        var(--cream);
+    box-shadow: 0 0 0 1px var(--ink);
+}
+
+/* ---------- chat panel ---------- */
+
+#chat-panel {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    top: 10px;
+    display: flex;
+    flex-direction: column;
+    background: rgba(43, 34, 51, 0.97);
+    color: var(--cream);
+    --frame: #1b1520;
+    animation: bubble-in 0.18s steps(3, end);
+}
+
+#chat-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 8px 12px 7px 17px;
+    background: var(--accent-dk);
+    cursor: grab;
+}
+
+/* The chat grows up and to the left (Clawd's corner stays put): grab its top or left edge,
+   or the grip in the top-left corner. The strips straddle the frame, so they're easy to hit. */
+.resize-edge { position: absolute; z-index: 2; }
+.resize-edge[data-edge="n"] { top: calc(-1 * var(--px)); left: 14px; right: 0; height: 6px; cursor: ns-resize; }
+.resize-edge[data-edge="w"] { left: calc(-1 * var(--px)); top: 14px; bottom: 0; width: 6px; cursor: ew-resize; }
+.resize-edge[data-edge="nw"] { top: calc(-1 * var(--px)); left: calc(-1 * var(--px)); width: 16px; height: 16px; cursor: nwse-resize; }
+.resize-edge[data-edge="nw"]::after {
+    content: "";
+    position: absolute;
+    left: calc(var(--px) + 3px);
+    top: calc(var(--px) + 3px);
+    width: 6px;
+    height: 6px;
+    background:
+        linear-gradient(var(--cream), var(--cream)) 0 0 / 2px 2px no-repeat,
+        linear-gradient(var(--cream), var(--cream)) 4px 0 / 2px 2px no-repeat,
+        linear-gradient(var(--cream), var(--cream)) 0 4px / 2px 2px no-repeat;
+    opacity: 0.45;
+}
+.resize-edge[data-edge="nw"]:hover::after { opacity: 0.95; }
+#chat-title { font-weight: 700; font-size: 13px; letter-spacing: 0.6px; color: var(--cream); }
+#chat-hint { flex: 1; font-size: 11px; color: rgba(255, 245, 226, 0.65); }
+#chat-close {
+    background: none;
+    border: none;
+    color: var(--cream);
+    font-size: 13px;
+    cursor: pointer;
+    opacity: 0.8;
+}
+#chat-close:hover { opacity: 1; }
+
+#chat-log {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 12px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+#chat-log::-webkit-scrollbar { width: 6px; }
+#chat-log::-webkit-scrollbar-thumb { background: var(--ink-3); }
+
+.msg {
+    max-width: 88%;
+    padding: 7px 11px 8px;
+    font-size: 13px;
+    line-height: 1.45;
+    user-select: text;
+    overflow-wrap: break-word;
+    --px: 2px;
+}
+.msg.euterpe { align-self: flex-start; background: var(--ink-3); --frame: var(--ink-3); }
+.msg.user { align-self: flex-end; background: var(--accent-user); --frame: var(--accent-user); }
+.msg.system {
+    align-self: center;
+    max-width: 95%;
+    padding: 2px 8px;
+    font-size: 11.5px;
+    color: var(--muted);
+    font-style: italic;
+    text-align: center;
+}
+.msg.system.error { color: #f0a2a2; }
+
+/* an edit Euterpe proposed (the diff itself is in VS Code) */
+.msg.proposal { align-self: flex-start; background: var(--ink-2); --frame: var(--accent); font-size: 12.5px; }
+.proposal-actions { display: flex; gap: 6px; margin-top: 7px; }
+.proposal-actions button {
+    padding: 2px 10px 3px;
+    border: none;
+    background: var(--ink-3);
+    color: var(--cream);
+    font: 600 11.5px var(--ui-font);
+    cursor: pointer;
+}
+.proposal-actions button[data-decision="accept"] { background: var(--accent); }
+.proposal-actions button:hover { background: var(--accent-lt); color: var(--ink); }
+.msg.proposal.settled { background: transparent; --frame: var(--ink-3); color: var(--muted); }
+.msg.proposal.accepted { color: #b9dcae; }
+
+.thinking-row {
+    align-self: flex-start;
+    display: flex;
+    gap: 5px;
+    padding: 10px 12px;
+    background: var(--ink-3);
+    --px: 2px;
+    --frame: var(--ink-3);
+}
+.thinking-row span {
+    width: 6px;
+    height: 6px;
+    background: var(--accent-lt);
+    animation: dot 1.1s steps(2, end) infinite;
+}
+.thinking-row span:nth-child(2) { animation-delay: 0.18s; }
+.thinking-row span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes dot {
+    0%, 100% { opacity: 0.25; transform: translateY(0); }
+    40% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* markdown bits, shared by the bubble and the log */
+pre {
+    position: relative;
+    margin: 6px 0 4px;
+    padding: 22px 10px 8px;
+    background: rgba(20, 14, 26, 0.9);
+    color: var(--cream);
+    font-family: var(--mono-font);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    user-select: text;
+}
+#bubble pre { background: var(--ink-2); }
+.copy-btn {
+    position: absolute;
+    top: 4px;
+    right: 5px;
+    padding: 1px 8px 2px;
+    border: none;
+    background: var(--accent);
+    color: var(--cream);
+    font: 600 10.5px var(--ui-font);
+    cursor: pointer;
+}
+.copy-btn:hover { background: var(--accent-lt); color: var(--ink); }
+code { font-family: var(--mono-font); font-size: 12px; padding: 0 3px; background: rgba(20, 14, 26, 0.35); }
+#bubble code { background: rgba(43, 34, 51, 0.1); }
+a { color: var(--accent-lt); text-decoration: underline; cursor: pointer; }
+#bubble a { color: var(--accent-dk); }
+ul, ol { margin: 3px 0 3px 18px; }
+blockquote { margin: 4px 0; padding-left: 8px; border-left: 3px solid var(--accent); opacity: 0.9; }
+
+#chat-inputrow {
+    display: flex;
+    gap: 8px;
+    padding: 8px 10px 10px;
+    background: rgba(27, 21, 32, 0.9);
+}
+#chat-input {
+    flex: 1;
+    resize: none;
+    border: none;
+    background: var(--ink-2);
+    color: var(--cream);
+    font: 13px/1.4 var(--ui-font);
+    padding: 7px 10px;
+    outline: none;
+    max-height: 110px;
+    --px: 2px;
+    --frame: var(--ink-3);
+}
+#chat-input:focus { --frame: var(--accent); }
+#chat-input::placeholder { color: #8d7f98; }
+#chat-send {
+    border: none;
+    width: 36px;
+    background: var(--accent);
+    color: var(--cream);
+    font-size: 14px;
+    cursor: pointer;
+    --px: 2px;
+    --frame: var(--accent-dk);
+}
+#chat-send:hover { background: var(--accent-lt); }

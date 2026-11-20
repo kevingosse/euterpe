@@ -1,0 +1,108 @@
+{
+  "format": 1,
+  "name": "Boo",
+  "description": "A small, friendly ghost who floats beside your text instead of walking.",
+  "body": "a small, pale lavender ghost with a scalloped hem and little arm nubs; you float instead of walking",
+  "colors": {
+    "B": "#E6E2F2",
+    "L": "#F5F3FB",
+    "H": "#FFFFFF",
+    "M": "#C8C1DC",
+    "D": "#A79EC2"
+  },
+  "float": 3,
+  "arms": {
+    "y": 11,
+    "length": 4,
+    "thickness": 3,
+    "front": [[0, -1], [23, 1]],
+    "side": [[10, 0]],
+    "back": [[0, -1], [23, 1]]
+  },
+  "views": {
+    "front": {
+      "rows": [
+        ".........LLLLLM.........",
+        ".......LLBBBBBBBM.......",
+        ".....LLBBBBBBBBBBBM.....",
+        "....LHHBBBBBBBBBBBBM....",
+        "...LHHBBBBBBBBBBBBBBM...",
+        "..LBHBBBBBBBBBBBBBBBBM..",
+        "..LBBBBBBBBBBBBBBBBBBM..",
+        ".LBBBBBBBBBBBBBBBBBBBBM.",
+        ".LBBBBBBBBBBBBBBBBBBBBM.",
+        "LBBBBBBBBBBBBBBBBBBBBBBM",
+        "LBBBBBBBBBBBBBBBBBBBBBBM",
+        "LBBBBBBBBBBBBBBBBBBBBBBM",
+        "LBBBBBBBBBBBBBBBBBBBBBBM",
+        "LBBBBBBBBBBBBBBBBBBBBBBM",
+        "LBBBBBBBBBBBBBBBBBBBBBBM",
+        "LBBBBBBBBBBBBBBBBBBBBBBM",
+        "BBBBBBBBBBBBBBBBBBBBBBBM",
+        "BBBMMBBBBBBMMBBBBBBMMBBM",
+        "BBMDDMBBBBMDDMBBBBMDDMBM",
+        "BMD..DMBBMD..DMBBMD..DMM",
+        "MD....DMMD....DMMD....DM",
+        "D......DD......DD......D"
+      ],
+      "eyes": [[7.5, 9], [16.5, 9]],
+      "mouth": [12, 14],
+      "blush": [[5, 12], [19, 12]]
+    },
+    "side": {
+      "rows": [
+        "....................",
+        ".........LLBBM......",
+        ".......LLBBBBBBM....",
+        ".....LLBHHBBBBBBBM..",
+        ".....LBHBBBBBBBBBM..",
+        "....LBBBBBBBBBBBBBM.",
+        "...LBBBBBBBBBBBBBBBM",
+        "...LBBBBBBBBBBBBBBBM",
+        "...LBBBBBBBBBBBBBBBM",
+        "...LBBBBBBBBBBBBBBBM",
+        "..LBBBBBBBBBBBBBBBBM",
+        "..LBBBBBBBBBBBBBBBBM",
+        ".LBBBBBBBBBBBBBBBBBM",
+        ".LBBBBBBBBBBBBBBBBBM",
+        "LBBBBBBBBBBBBBBBBBBM",
+        "MMBBBBBBBBBBBBBBBBBM",
+        "DDMBBBBBBBBBBBBBBBBM",
+        "..DMBBBBBMBBBBBBMBBM",
+        "...DMBBBMDMBBBBMDMBM",
+        "....DMBMD.DMBBMD.DMM",
+        ".....DMD...DMMD...DM",
+        "......D.....DD.....D"
+      ],
+      "eyes": [[15.5, 9]],
+      "mouth": [16, 14],
+      "blush": [[13.5, 12]]
+    },
+    "back": {
+      "rows": [
+        ".........MBLLLL.........",
+        ".......MBBBBBBBLL.......",
+        ".....MBBBBBBBBBBBLL.....",
+        "....MBBBBBBBBBBBBBBL....",
+        "...MBBBBBBBBBBBBBBBBL...",
+        "..MBBBBBBBBBBBBBBBBBBL..",
+        "..MBBBBBBBBBBBBBBBBBBL..",
+        ".MBBBBBBBBBBBBBBBBBBBBL.",
+        ".MBBBBBBBBBBBBBBBBBBBBL.",
+        "MBBBBBBBBBBBBBBBBBBBBBBL",
+        "MBBBBBBBBBBBBBBBBBBBBBBL",
+        "MBBBBBBBBBBBBBBBBBBBBBBL",
+        "MBBBBBBBBBBBBBBBBBBBBBBL",
+        "MBBBBBBBBBBBBBBBBBBBBBBL",
+        "MBBBBBBBBBBBBBBBBBBBBBBL",
+        "MBBBBBBBBBBBBBBBBBBBBBBL",
+        "MBBBBBBBBBBBBBBBBBBBBBBB",
+        "MBBMMBBBBBBMMBBBBBBMMBBB",
+        "MBMDDMBBBBMDDMBBBBMDDMBB",
+        "MMD..DMBBMD..DMBBMD..DMB",
+        "MD....DMMD....DMMD....DM",
+        "D......DD......DD......D"
+      ]
+    }
+  }
+}
