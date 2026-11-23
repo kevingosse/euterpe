@@ -406,6 +406,8 @@
     });
     $("chat-send").addEventListener("click", submit);
     $("chat-close").addEventListener("click", closeChat);
+    $("chat-default-size").addEventListener("click", () => E.defaultSize());
+    E.onResized((resized) => $("chat-default-size").classList.toggle("hidden", !resized));
     badge.addEventListener("click", () => {
         openChat(false);
         appendSystem("You asked for the notes.");

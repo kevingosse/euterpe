@@ -103,7 +103,7 @@ module.exports = {
             async run(t) {
                 await startSession(t);
                 await t.overlay.do("menu");
-                await t.screen("body", "Right-click on Euterpe", "Its menu. \"Default chat size\" shows because the chat was made bigger in an earlier session (the window remembers its place and size).");
+                await t.screen("body", "Right-click on Euterpe", "Its menu.");
                 await t.overlay.do("pick", null);
                 await t.overlay.do("text-menu", "#bubble-content");
                 await t.screen("text", "Right-click on its words", "Copy what's selected (Euterpe's window usually doesn't have the keyboard, so the page's own copy can't).");
@@ -113,6 +113,7 @@ module.exports = {
                 await t.overlay.do("text-menu", "#chat-input", false);
                 await t.screen("input", "Right-click in the chat's input", "Cut, Copy, Paste and Select All are Electron's own labels for its menu roles.");
                 await t.overlay.do("pick", null);
+                await t.screen("chat", "The chat, made bigger earlier", "The ⇲ by the close button puts it back to its default size. It shows only once the chat has been resized (the window remembers its place and size).");
             },
         },
         {

@@ -92,6 +92,11 @@ function saveState() {
 function place(bounds) {
     size = { width: bounds.width, height: bounds.height };
     win.setBounds(bounds);
+    sendResized();
+}
+// The chat header offers its default size back only once it's been resized.
+function sendResized() {
+    if (alive()) win.webContents.send("resized", size.width !== DEFAULT_W || size.height !== DEFAULT_H);
 }
 // A new size (never below the default), with the bottom-right corner (Clawd) where it was.
 function resizeTo(width, height) {
@@ -282,7 +287,7 @@ function createWindow() {
     if (token) query.token = token;
     if (demo) query.demo = "1";
     win.loadFile(path.join(__dirname, "renderer", "index.html"), { query });
-    win.webContents.on("did-finish-load", sendGaze);
+    win.webContents.on("did-finish-load", () => { sendGaze(); sendResized(); });
 
     // This window only ever shows its own page: no navigation (a file dropped on it), no popups.
     win.webContents.on("will-navigate", (e) => e.preventDefault());
@@ -420,15 +425,18 @@ ipcMain.on("resize-start", (_ev, edge) => {
     }, 16);
 });
 ipcMain.on("resize-end", endResize);
+ipcMain.on("default-size", () => {
+    if (!alive() || resize) return;
+    resizeTo(DEFAULT_W, DEFAULT_H);
+    saveState();
+});
 
 ipcMain.on("show-context-menu", () => {
     if (!alive()) return;
     const send = (cmd) => alive() && win.webContents.send("menu", cmd);
-    const resized = size.width !== DEFAULT_W || size.height !== DEFAULT_H;
     popupMenu([
         { label: "Talk to Euterpe", click: () => send("talk") },
         { label: "Back to the corner", click: () => { if (!alive()) return; place(cornerBounds(clawdDisplay())); saveState(); sendGaze(); } },
-        ...(resized ? [{ label: "Default chat size", click: () => { if (!alive()) return; resizeTo(DEFAULT_W, DEFAULT_H); saveState(); } }] : []),
         { type: "separator" },
         { label: "End writing session", click: () => send("close") },
     ]);

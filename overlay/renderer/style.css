@@ -192,7 +192,7 @@ html, body {
 .resize-edge[data-edge="nw"]:hover::after { opacity: 0.95; }
 #chat-title { font-weight: 700; font-size: 13px; letter-spacing: 0.6px; color: var(--cream); }
 #chat-hint { flex: 1; font-size: 11px; color: rgba(255, 245, 226, 0.65); }
-#chat-close {
+#chat-close, #chat-default-size {
     background: none;
     border: none;
     color: var(--cream);
@@ -200,7 +200,7 @@ html, body {
     cursor: pointer;
     opacity: 0.8;
 }
-#chat-close:hover { opacity: 1; }
+#chat-close:hover, #chat-default-size:hover { opacity: 1; }
 
 #chat-log {
     flex: 1;

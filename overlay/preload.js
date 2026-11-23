@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld("euterpe", {
     onDragMove: (cb) => ipcRenderer.on("drag-move", (_e, v) => cb(v)),
     resizeStart: (edge) => ipcRenderer.send("resize-start", edge),
     resizeEnd: () => ipcRenderer.send("resize-end"),
+    defaultSize: () => ipcRenderer.send("default-size"),
+    onResized: (cb) => ipcRenderer.on("resized", (_e, resized) => cb(resized)),
     onGaze: (cb) => ipcRenderer.on("gaze", (_e, dir) => cb(dir)),
     onPointer: (cb) => ipcRenderer.on("pointer", (_e, at) => cb(at)),
     showContextMenu: () => ipcRenderer.send("show-context-menu"),
