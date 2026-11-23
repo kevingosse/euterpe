@@ -7,14 +7,17 @@ import { isMascotId, Mascot } from "./mascots";
 import { modelName, modelsFor, sameModel } from "./models";
 import { isPersonaId, Persona } from "./personas";
 import { Endpoint, PROVIDERS, Provider } from "./providers";
+import type { StartedWith } from "./session";
 
 /** The efforts Euterpe offers, of those claude --effort and the APIs take, as package.json lists them. */
 export const EFFORTS = ["low", "medium", "high", "xhigh"] as const;
 /** Avatar sizes: screen pixels per art pixel. */
 export const AVATAR_SCALES = [2, 3, 4, 5, 6] as const;
 /** The settings that are paths on this computer (machine-scoped: the writer's own settings only). */
-export const PATH_SETTINGS = ["homeDir", "claudeConfigDir", "claudePath", "electronPath", "personaFile"] as const;
+export const PATH_SETTINGS = ["homeDir", "claudeConfigDir", "claudePath"] as const;
 export type PathSetting = typeof PATH_SETTINGS[number];
+/** Settings the window leaves to VS Code's settings page: an Electron for a computer that can't download it. */
+export const OUTSIDE_WINDOW = ["electronPath"] as const;
 /** Settings only the writer's own settings hold: the paths, and where the API key and the writing go. */
 export const MACHINE_SETTINGS = [...PATH_SETTINGS, "openaiBaseUrl"] as const;
 
@@ -57,8 +60,6 @@ export const SETTINGS = {
     homeDir: pathValue,
     claudeConfigDir: pathValue,
     claudePath: pathValue,
-    electronPath: pathValue,
-    personaFile: pathValue,
 } satisfies Record<string, (v: unknown) => string | number | boolean | null>;
 
 export type SettingKey = keyof typeof SETTINGS;
@@ -141,16 +142,16 @@ export interface SettingsState {
     /** What the running session's mind runs on, during one. */
     liveProvider?: Provider;
     api: ApiView;
-    /** On GitHub Copilot: why it offers no models, when it doesn't (no Copilot here, or signed out of it). */
-    copilot?: { problem?: string };
+    /** On GitHub Copilot: why it offers no models, when it doesn't (no Copilot here, or signed out of it); else the GitHub account, when VS Code is signed in to just one. */
+    copilot?: { problem?: string; account?: string };
     values: Record<SettingKey, SettingValue>;
     /** Settings this workspace's own settings set: the window changes them there. */
     workspace: SettingKey[];
     personas: PersonaView[];
     /** The persona the next session gets (a missing one falls back). */
     persona: string;
-    /** euterpe.personaFile, when it's set and wins over the personas. */
-    personaFile: { path: string; name?: string; problem?: string } | null;
+    /** During a session: what it started with of the settings only the next one takes on. */
+    live?: StartedWith;
     mascots: MascotView[];
     /** The body Euterpe wears now, or will at the next session. */
     mascot: string;

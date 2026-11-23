@@ -15,7 +15,7 @@ import { defaultModel, modelName, sameModel } from "./models";
 import { apiClient } from "./openaiMind";
 import { choosePersona } from "./personas";
 import { Endpoint, endpointFor, providerFor } from "./providers";
-import { expandHome, memoryDir, resolveConfigDir } from "./session";
+import { memoryDir, resolveConfigDir } from "./session";
 
 export interface SetupContext {
     output: vscode.OutputChannel;
@@ -77,13 +77,12 @@ export async function checkSetup(ctx: SetupContext): Promise<void> {
         add(true, fs.existsSync(memory) ? `Memory: ${memory}` : `Memory: ${home} (Euterpe starts its memory there at the first session)`);
 
         try {
-            const file = cfg.get<string>("personaFile")?.trim() ?? "";
-            const { persona, missing } = choosePersona(file && expandHome(file), cfg.get<string>("persona") ?? "",
+            const { persona, missing } = choosePersona(cfg.get<string>("persona") ?? "",
                 path.join(ctx.extensionRoot, "mind", "personas"), path.join(home, "personas"));
             if (missing) { add(false, `The persona "${missing}" (euterpe.persona) isn't there: Euterpe will be ${persona.name}.`); }
             else { add(true, `Persona: ${persona.name}${persona.bundled ? "" : ` (${persona.file})`}`); }
         } catch (err) {
-            add(false, `euterpe.personaFile: ${(err as Error).message}`);
+            add(false, (err as Error).message);
         }
     });
 

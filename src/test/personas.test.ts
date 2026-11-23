@@ -53,18 +53,18 @@ test("the writer's own personas shadow bundled ones, and a missing one falls bac
     assert.equal(all.find((p) => p.id === "warm")?.bundled, false);
     assert.equal(findPersona("../warm", BUNDLED, mine), null);
 
-    assert.equal(choosePersona("", "warm", BUNDLED, mine).persona.body, "Mine.");
-    const gone = choosePersona("", "vanished", BUNDLED, mine);
+    assert.equal(choosePersona("warm", BUNDLED, mine).persona.body, "Mine.");
+    const gone = choosePersona("vanished", BUNDLED, mine);
     assert.equal(gone.persona.id, "cheeky");
     assert.equal(gone.missing, "vanished");
-    assert.equal(choosePersona("", "", BUNDLED, mine).persona.id, "cheeky");
+    assert.equal(choosePersona("", BUNDLED, mine).persona.id, "cheeky");
 });
 
-test("a persona file wins over the setting's name, and an oversized one is refused", () => {
+test("a persona file is named after itself, and an oversized one is refused", () => {
     const dir = scratch();
     const file = path.join(dir, "Stage Fright.md");
     fs.writeFileSync(file, "You are shy.");
-    assert.equal(choosePersona(file, "warm", BUNDLED, "").persona.body, "You are shy.");
+    assert.equal(loadPersonaFile(file).body, "You are shy.");
     assert.equal(loadPersonaFile(file).id, "stage-fright");
     fs.writeFileSync(file, "x".repeat(MAX_PERSONA_BYTES + 1));
     assert.throws(() => loadPersonaFile(file), /at most/);

@@ -111,20 +111,6 @@ module.exports = {
             },
         },
         {
-            id: "persona-file-conflict",
-            title: "euterpe.personaFile in the way",
-            summary: "The writer set euterpe.personaFile (a persona anywhere on disk), then picks a persona in the chooser.",
-            world: { files: { "~/Dropbox/euterpe/me.md": "---\nname: Mine\ndescription: The one I sync.\n---\nYou are blunt.\n" }, settings: { personaFile: "{home}/Dropbox/euterpe/me.md" } },
-            async run(t) {
-                t.run("euterpe.choosePersona");
-                const qp = await t.quickPick({ title: "Euterpe's Persona" });
-                await t.screen("chooser", "The chooser, with a persona file", "The current one is the file's (it isn't among these).");
-                qp.pick("Warm");
-                await t.notification({ text: /personaFile is set/ });
-                await t.screen("clear", "Clear it?", "The file wins over the persona picked: clear it, so the pick counts.");
-            },
-        },
-        {
             id: "personas-folder",
             title: "Your personas folder",
             summary: "Open Your Personas Folder (in the chooser).",

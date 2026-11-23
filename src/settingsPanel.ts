@@ -13,7 +13,6 @@ import { ChatGptLogin, EndedLogin, MANAGE_USAGE_URL, planDefault, PlanModel } fr
 import { resolveClaude } from "./claudeCli";
 import { UnknownSettingError, updateSetting } from "./config";
 import { copilotDefault, copilotDetail } from "./copilot";
-import { ELECTRON_VERSION, findElectron } from "./electronRuntime";
 import { chooseMascot, defaultMascot, listMascots } from "./mascots";
 import {
     installMascot, makeWithEuterpe, MascotHost, mascotDirs, openMascotGuide, openMascotsFolder, previewMascot, wearMascot,
@@ -23,7 +22,7 @@ import { ModelHost, useModel } from "./modelCommands";
 import { defaultModel, modelSetting } from "./models";
 import { apiClient } from "./openaiMind";
 import { editPersona, installPersona, newPersona, openPersonasFolder, PersonaHost, personaDirs, usePersona } from "./personaCommands";
-import { choosePersona, listPersonas, loadPersonaFile } from "./personas";
+import { choosePersona, listPersonas } from "./personas";
 import { Endpoint, endpointFor, Provider, providerFor } from "./providers";
 import { expandHome, memoryDir, resolveConfigDir } from "./session";
 import {
@@ -50,6 +49,19 @@ export interface SettingsHost extends MascotHost, PersonaHost, ModelHost {
     signOut(): Promise<void>;
     /** The models the writer's ChatGPT plan offers. */
     planModels(): Promise<PlanModel[]>;
+}
+
+/**
+ * The GitHub account VS Code is signed in to, which GitHub Copilot uses: only when there's just one
+ * (with several, Copilot's pick isn't for Euterpe to know).
+ */
+async function githubAccount(): Promise<string | undefined> {
+    try {
+        const accounts = await vscode.authentication?.getAccounts?.("github");
+        return accounts?.length === 1 ? accounts[0].label : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 /** How long the window trusts the plan's models it listed. */
@@ -121,6 +133,8 @@ export class SettingsPanel implements vscode.Disposable {
             }),
             // GitHub Copilot's models come and go (a sign-in, a plan, a policy).
             ...(vscode.lm?.onDidChangeChatModels ? [vscode.lm.onDidChangeChatModels(() => this.scheduleRefresh())] : []),
+            // (and the GitHub account it's signed in with)
+            ...(vscode.authentication?.onDidChangeSessions ? [vscode.authentication.onDidChangeSessions(() => this.scheduleRefresh())] : []),
         );
     }
 
@@ -222,7 +236,6 @@ export class SettingsPanel implements vscode.Disposable {
             case "newPersona": await newPersona(host); break;
             case "installPersona": await installPersona(host); break;
             case "personasFolder": await openPersonasFolder(host); break;
-            case "clearPersonaFile": await updateSetting("personaFile", undefined); break;
             case "installMascot": await installMascot(host); break;
             case "makeMascot": await makeWithEuterpe(host); break;
             case "mascotGuide": await openMascotGuide(host); break;
@@ -290,12 +303,11 @@ export class SettingsPanel implements vscode.Disposable {
         const folder = key === "homeDir" || key === "claudeConfigDir";
         const current = vscode.workspace.getConfiguration("euterpe").get<string>(key)?.trim();
         const [uri] = await vscode.window.showOpenDialog({
-            title: { homeDir: "Euterpe's Home", claudeConfigDir: "Claude Code Config Folder", claudePath: "The claude Executable", electronPath: "An Electron Executable", personaFile: "A Persona File" }[key],
+            title: { homeDir: "Euterpe's Home", claudeConfigDir: "Claude Code Config Folder", claudePath: "The claude Executable" }[key],
             canSelectFiles: !folder,
             canSelectFolders: folder,
             canSelectMany: false,
             defaultUri: current ? vscode.Uri.file(expandHome(current)) : undefined,
-            filters: key === "personaFile" ? { Persona: ["md"] } : undefined,
         }) ?? [];
         if (uri) { await updateSetting(key, uri.fsPath); }
     }
@@ -332,13 +344,7 @@ export class SettingsPanel implements vscode.Disposable {
         const pd = personaDirs(host);
         const personas = listPersonas(pd.bundled, pd.mine);
         let persona = String(values.persona ?? "");
-        try { persona = choosePersona("", persona, pd.bundled, pd.mine).persona.id; } catch { /* shown as it is */ }
-        const personaFile = String(values.personaFile ?? "").trim();
-        let personaFileView: SettingsState["personaFile"] = null;
-        if (personaFile) {
-            try { personaFileView = { path: personaFile, name: loadPersonaFile(expandHome(personaFile)).name }; }
-            catch (err) { personaFileView = { path: personaFile, problem: (err as Error).message }; }
-        }
+        try { persona = choosePersona(persona, pd.bundled, pd.mine).persona.id; } catch { /* shown as it is */ }
 
         const md = mascotDirs(host);
         const s = host.session();
@@ -358,7 +364,7 @@ export class SettingsPanel implements vscode.Disposable {
                 const models = await host.copilotModels();
                 const pick = copilotDefault(models);
                 listed = models.map((m) => ({ id: m.id, name: m.name, detail: copilotDetail(m.id, pick) }));
-                copilot = models.length ? {} : { problem: "GitHub Copilot offers Euterpe no models: sign in to GitHub Copilot in VS Code first." };
+                copilot = models.length ? { account: await githubAccount() } : { problem: "GitHub Copilot offers Euterpe no models: sign in to GitHub Copilot in VS Code first." };
             } catch (err) {
                 listed = [];
                 copilot = { problem: (err as Error).message };
@@ -375,7 +381,7 @@ export class SettingsPanel implements vscode.Disposable {
             workspace,
             personas: personas.map(personaView),
             persona,
-            personaFile: personaFileView,
+            ...(active?.startedWith ? { live: active.startedWith } : {}),
             mascots: listMascots(md.bundled, md.mine, provider).map(mascotView),
             mascot: live?.wearing.id ?? chooseMascot(String(values.mascot ?? ""), md.bundled, md.mine, provider).mascot.id,
             defaultMascot: defaultMascot(provider),
@@ -446,22 +452,6 @@ export class SettingsPanel implements vscode.Disposable {
             ? { value: claude, hint: at("claudePath") === claude ? "" : at("claudePath"), problem: fs.existsSync(at("claudePath")) ? undefined : `${at("claudePath")} doesn't exist.` }
             : { value: "", hint: "" };
 
-        const electron = value("electronPath");
-        if (electron) {
-            out.electronPath = { value: electron, hint: at("electronPath") === electron ? "" : at("electronPath"), problem: fs.existsSync(at("electronPath")) ? undefined : `${at("electronPath")} doesn't exist.` };
-        } else {
-            let found: string | null = null;
-            try { found = findElectron({ override: "", extensionRoot: this.host.extensionRoot, storageDir: this.host.storageDir }); } catch { /* none */ }
-            out.electronPath = { value: "", hint: found ? `In use: ${found}` : `Not downloaded yet: the first session offers to (Electron ${ELECTRON_VERSION}, about 150 MB, once)` };
-        }
-
-        const persona = value("personaFile");
-        if (persona) {
-            try { out.personaFile = { value: persona, hint: `The persona in it: ${loadPersonaFile(at("personaFile")).name}` }; }
-            catch (err) { out.personaFile = { value: persona, hint: at("personaFile"), problem: (err as Error).message }; }
-        } else {
-            out.personaFile = { value: "", hint: "" };
-        }
         return out;
     }
 

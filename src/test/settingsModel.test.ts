@@ -4,16 +4,19 @@ import * as path from "node:path";
 import { test } from "node:test";
 import { ATTENTION } from "../attention";
 import { OPENAI_MODELS } from "../models";
-import { AVATAR_SCALES, checkSetting, EFFORTS, MACHINE_SETTINGS, modelViews, SETTINGS } from "../settingsModel";
+import { AVATAR_SCALES, checkSetting, EFFORTS, MACHINE_SETTINGS, modelViews, OUTSIDE_WINDOW, SETTINGS } from "../settingsModel";
 
 // The settings package.json contributes, by key (without "euterpe."), across its sections.
 const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "package.json"), "utf8"));
 const contributed: Record<string, any> = {};
 for (const section of manifest.contributes.configuration) {
-    for (const [key, schema] of Object.entries(section.properties)) { contributed[key.replace(/^euterpe\./, "")] = schema; }
+    for (const [key, schema] of Object.entries(section.properties)) {
+        const k = key.replace(/^euterpe\./, "");
+        if (!(OUTSIDE_WINDOW as readonly string[]).includes(k)) { contributed[k] = schema; }
+    }
 }
 
-test("the settings window covers every setting, and only those", () => {
+test("the settings window covers every setting but the ones it leaves to VS Code, and only those", () => {
     assert.deepEqual(Object.keys(SETTINGS).sort(), Object.keys(contributed).sort());
 });
 
@@ -58,8 +61,8 @@ test("a model is one word Claude Code resolves", () => {
 test("a path is one line, trimmed", () => {
     assert.deepEqual(checkSetting("homeDir", "  ~/Sync/euterpe  "), { key: "homeDir", value: "~/Sync/euterpe" });
     assert.equal(checkSetting("claudePath", "C:\\claude.exe\n--dangerous"), null);
-    assert.equal(checkSetting("electronPath", "x".repeat(1025)), null);
-    assert.equal(checkSetting("personaFile", 5), null);
+    assert.equal(checkSetting("claudeConfigDir", "x".repeat(1025)), null);
+    assert.equal(checkSetting("homeDir", 5), null);
 });
 
 test("only Euterpe's own settings can be set", () => {

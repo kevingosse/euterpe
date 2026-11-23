@@ -5,7 +5,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { updateSetting } from "./config";
 import { choosePersona, listPersonas, loadPersonaFile, newPersonaText, Persona, personaId } from "./personas";
-import { expandHome, memoryDir } from "./session";
+import { memoryDir } from "./session";
 
 export interface PersonaHost {
     extensionRoot: string;
@@ -23,12 +23,7 @@ const dirs = personaDirs;
 function currentPersona(host: PersonaHost): Persona {
     const cfg = vscode.workspace.getConfiguration("euterpe");
     const { bundled, mine } = dirs(host);
-    const file = cfg.get<string>("personaFile")?.trim() ?? "";
-    try {
-        return choosePersona(file && expandHome(file), cfg.get<string>("persona") ?? "", bundled, mine).persona;
-    } catch {
-        return choosePersona("", cfg.get<string>("persona") ?? "", bundled, mine).persona;
-    }
+    return choosePersona(cfg.get<string>("persona") ?? "", bundled, mine).persona;
 }
 
 type Item = vscode.QuickPickItem & { persona?: Persona; action?: "new" | "install" | "folder" };
@@ -87,20 +82,12 @@ export async function openPersonasFolder(host: PersonaHost): Promise<void> {
     await vscode.env.openExternal(vscode.Uri.file(mine));
 }
 
-/** Make `p` the persona of the next sessions; false if euterpe.personaFile stays in the way. */
-export async function usePersona(host: PersonaHost, p: Persona, quiet = false): Promise<boolean> {
-    const cfg = vscode.workspace.getConfiguration("euterpe");
+/** Make `p` the persona of the next sessions. */
+export async function usePersona(host: PersonaHost, p: Persona, quiet = false): Promise<void> {
     await updateSetting("persona", p.id);
-    if (cfg.get<string>("personaFile")?.trim()) {
-        const clear = await vscode.window.showWarningMessage(
-            `euterpe.personaFile is set, and it wins over the persona you picked. Clear it, so Euterpe is ${p.name}?`, "Clear It");
-        if (!clear) { return false; }
-        await cfg.update("personaFile", undefined, vscode.ConfigurationTarget.Global);
-    }
     if (!quiet && host.sessionRunning()) {
         void vscode.window.showInformationMessage(`Euterpe will be ${p.name} from the next session.`);
     }
-    return true;
 }
 
 /** "Euterpe: New Persona": a copy of `from` (or the current persona) under a new name, opened for writing. */
@@ -119,9 +106,8 @@ export async function newPersona(host: PersonaHost, from?: Persona): Promise<voi
     fs.mkdirSync(mine, { recursive: true });
     fs.writeFileSync(file, newPersonaText(name, base), "utf8");
     await vscode.window.showTextDocument(vscode.Uri.file(file));
-    if (await usePersona(host, loadPersonaFile(file), true)) {
-        void vscode.window.showInformationMessage(`Euterpe is ${name} from the next session. Rewrite it as you like, and save.`);
-    }
+    await usePersona(host, loadPersonaFile(file), true);
+    void vscode.window.showInformationMessage(`Euterpe is ${name} from the next session. Rewrite it as you like, and save.`);
 }
 
 /** "Euterpe: Install Persona…": a persona file someone shared, read first, then copied into the writer's personas. */

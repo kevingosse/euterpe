@@ -95,7 +95,6 @@ Euterpe takes a short look whenever you pause, mostly served from the prompt cac
 | `euterpe.followActiveEditor` | `true` | Follow you to whatever document you switch to. When off, Euterpe stays with the document the session started on. |
 | `euterpe.claudeConfigDir` | *(inherited)* | Claude Code config folder for the mind (`CLAUDE_CONFIG_DIR`): which login pays, which settings it reads. Useful if you keep several Claude Code setups, say a personal subscription and a work API key. |
 | `euterpe.homeDir` | `~/.euterpe` | Euterpe's home: memory, your personas and mascots, the mind's working directory. A synced folder shares them between machines. User settings only. |
-| `euterpe.personaFile` | *(none)* | A persona Markdown file anywhere on disk, instead of `euterpe.persona`. User settings only. |
 | `euterpe.claudePath` | *(automatic)* | The `claude` executable. Found by default on PATH, where the native installer, Homebrew, WinGet and npm put it, or inside the Claude Code VS Code extension. |
 | `euterpe.electronPath` | *(downloaded)* | An Electron executable for the avatar's window, for machines that can't download it. |
 | `euterpe.debugMind` | `false` | Opens an **Euterpe Mind** terminal with a live transcript (perceptions, replies, tool calls, token usage) and logs the raw traffic. |

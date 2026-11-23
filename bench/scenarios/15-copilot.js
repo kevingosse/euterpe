@@ -51,9 +51,9 @@ module.exports = {
                 setup.click("Continue with GitHub");
                 await t.wait(1500);
                 await t.webview.do("top");
-                await t.screen("signed-in", "Signed in", "As soon as VS Code has Copilot's models.");
+                await t.screen("signed-in", "Signed in", "As soon as VS Code has Copilot's models, with the GitHub account when VS Code has just one.");
                 await t.webview.do("scroll", "#mind");
-                await t.screen("models", "Copilot's models", "By Copilot's names; Euterpe's pick is Auto, where Copilot chooses the model. No Effort: Copilot sets it. Below, what each look costs.");
+                await t.screen("models", "Copilot's models", "By Copilot's names; Euterpe's pick is Auto, where Copilot chooses the model. No Effort: Copilot sets it.");
             },
         },
         {

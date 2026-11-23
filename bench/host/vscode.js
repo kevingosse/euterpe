@@ -1031,6 +1031,13 @@ function createVscode(bench) {
         tools: [],
     };
 
+    // VS Code's GitHub sign-in: the account Copilot uses, while Copilot offers models (world.copilot.account).
+    api.authentication = {
+        getAccounts: async (providerId) => (providerId === "github" && (copilot().models || []).length
+            ? [{ id: "github-1", label: copilot().account || "writer" }] : []),
+        onDidChangeSessions: ev.lmModels.event,
+    };
+
     // ---------- the environment ----------
     api.env = {
         appName: "Visual Studio Code",

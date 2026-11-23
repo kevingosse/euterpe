@@ -79,7 +79,7 @@ export function findPersona(id: string, bundledDir: string, userDir: string): Pe
     return readPersona(path.join(userDir, `${id}.md`), id, false) ?? readPersona(path.join(bundledDir, `${id}.md`), id, true);
 }
 
-/** A persona file anywhere (euterpe.personaFile, or one being installed). Throws if unreadable or too big. */
+/** A persona file anywhere (one being installed, or just written). Throws if unreadable or too big. */
 export function loadPersonaFile(file: string): Persona {
     const size = fs.statSync(file).size;
     if (size > MAX_PERSONA_BYTES) {
@@ -90,12 +90,10 @@ export function loadPersonaFile(file: string): Persona {
 }
 
 /**
- * The persona a session gets: the file euterpe.personaFile names (already ~-expanded; throws if
- * it can't be read), else the one euterpe.persona names, else the default. `missing` is the id
+ * The persona a session gets: the one euterpe.persona names, else the default. `missing` is the id
  * that couldn't be found, when it came to that.
  */
-export function choosePersona(personaFile: string, id: string, bundledDir: string, userDir: string): { persona: Persona; missing?: string } {
-    if (personaFile) { return { persona: loadPersonaFile(personaFile) }; }
+export function choosePersona(id: string, bundledDir: string, userDir: string): { persona: Persona; missing?: string } {
     const wanted = id || DEFAULT_PERSONA;
     const persona = findPersona(wanted, bundledDir, userDir);
     if (persona) { return { persona }; }

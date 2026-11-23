@@ -53,8 +53,6 @@
         ["homeDir", "Euterpe's home", "Its memory, your personas and mascots, and where its mind runs. A synced folder shares them between your computers.", "~/.euterpe"],
         ["claudeConfigDir", "Claude Code config folder", "Which Claude Code setup the mind uses: its login (a subscription or an API key) and its settings. For when you keep several.", "Inherited from VS Code's environment", "claude"],
         ["claudePath", "Claude Code", "The claude executable.", "Found automatically", "claude"],
-        ["electronPath", "Avatar runtime", "An Electron executable for Euterpe's window, for computers that can't download it.", "Downloaded by Euterpe"],
-        ["personaFile", "Persona file", "A persona anywhere on disk, instead of the ones above.", "None"],
     ];
 
     let state = null;
@@ -109,17 +107,9 @@
     }
 
     function header() {
-        const s = !state.trusted && state.session === "none" ? ["untrusted", "Restricted Mode"]
-            : state.session === "active" ? ["active", "Writing with you"]
-            : state.session === "starting" ? ["starting", "On the way…"]
-            : ["none", "Not in a session"];
         return h`<header class="top">
             <img class="mark" src="${claude() ? app.dataset.icon : onCopilot() ? app.dataset.iconCopilot : app.dataset.iconOpenai}" alt="" width="44" height="44">
-            <div class="title">
-                <h1>Euterpe</h1>
-                <p class="muted">Who your writing companion is, how it looks, and how it thinks. Changes save as you make them.</p>
-            </div>
-            <div class="state state-${s[0]}" role="status"><span class="dot" aria-hidden="true"></span>${s[1]}</div>
+            <h1>Euterpe</h1>
         </header>`;
     }
 
@@ -148,10 +138,12 @@
         return h`<nav class="toc" aria-label="Sections">${SECTIONS.map(([id, name]) => h`<a href="#${id}" data-goto="${id}">${name}</a>`)}</nav>`;
     }
 
-    /** When a change lands: during a session, at once or at the next one. */
-    function when(now) {
-        if (state.session !== "active") return "";
-        return now ? h`<span class="chip chip-now">Changes at once</span>` : h`<span class="chip">From the next session</span>`;
+    /** A choice the running session doesn't have: it waits for the next one (only a new session takes it on). */
+    function later(key) {
+        const live = state.session === "active" && state.live;
+        if (!live) return "";
+        const now = key === "persona" ? state.persona : state.values[key];
+        return now === live[key] ? "" : h`<span class="chip chip-next" role="status">Takes effect at the next session</span>`;
     }
     const ws = (key) => (state.workspace.includes(key)
         ? h`<span class="chip chip-ws" title="This workspace's settings set it, so a change here goes there.">Set by this workspace</span>` : "");
@@ -172,9 +164,8 @@
 
     // ---------- persona ----------
     function personaSection() {
-        const file = state.personaFile;
         const cards = state.personas.map((p) => {
-            const current = !file && p.id === state.persona, open = ui.read.has(p.id);
+            const current = p.id === state.persona, open = ui.read.has(p.id);
             return h`<div class="card persona${current ? " is-current" : ""}${open ? " is-open" : ""}">
                 <button class="card-main" data-set="persona" data-value="${p.id}" aria-pressed="${String(current)}" data-focus="persona:${p.id}">
                     <span class="card-title">${p.name}${p.bundled ? "" : h` <span class="badge">yours</span>`}</span>
@@ -187,21 +178,14 @@
                 ${open ? h`<div class="persona-text">${raw(personaHtml(p.text))}</div>` : ""}
             </div>`;
         });
-        const override = file ? h`<div class="notice${file.problem ? " is-problem" : ""}">
-            <p>${file.problem
-                ? h`<strong>euterpe.personaFile</strong> is set, but it can't be read: ${file.problem}`
-                : h`<strong>euterpe.personaFile</strong> wins over these: Euterpe is <strong>${file.name}</strong>, from ${file.path}.`}</p>
-            <button class="btn" data-run="clearPersonaFile">Stop Using It</button>
-        </div>` : "";
-        return section("persona", "Persona", "Who Euterpe is",
-            "Its personality: how it talks, teases and encourages.",
-            h`${override}<div class="grid grid-personas">${cards}</div>
+        return section("persona", "Persona", "Who Euterpe is", "",
+            h`<div class="grid grid-personas">${cards}</div>
             <div class="actions">
                 <button class="btn" data-run="newPersona">New Persona…</button>
                 <button class="btn" data-run="installPersona">Install a Persona…</button>
                 <button class="link" data-run="personasFolder">Open your personas folder</button>
             </div>`,
-            h`${ws("persona")}${when(false)}`);
+            h`${ws("persona")}${later("persona")}`);
     }
 
     // A persona's words, as Markdown (escaped by markdown.js); headings read as bold lines.
@@ -235,13 +219,12 @@
                 <div class="stage-info">
                     <h3>${m ? m.name : ""}</h3>
                     ${m && m.description ? h`<p>${m.description}</p>` : ""}
-                    ${m && m.body ? h`<p class="muted body-line">Euterpe knows its body as “${m.body}”.</p>` : ""}
                     <div class="field">
-                        <div class="field-label">Size on screen ${ws("avatarScale")} ${when(false)}</div>
+                        <div class="field-label">Size on screen ${ws("avatarScale")} ${later("avatarScale")}</div>
                         <div class="segmented" role="group" aria-label="Size on screen">
                             ${SIZES.map(([v, name]) => h`<button data-set="avatarScale" data-value="${v}" data-type="number" aria-pressed="${String(v === scale)}" data-focus="size:${v}" aria-label="${name} (${v})" title="${name}">${v}</button>`)}
                         </div>
-                        <p class="muted small">${(SIZES.find(([v]) => v === scale) || SIZES[2])[1]}: each pixel of its art is ${scale} × ${scale} pixels on screen, as in the preview.</p>
+                        <p class="muted small">${(SIZES.find(([v]) => v === scale) || SIZES[2])[1]}</p>
                     </div>
                     ${m ? h`<button class="link" data-run="modelSheet" data-arg="${m.id}">See its model sheet</button>` : ""}
                 </div>
@@ -253,7 +236,7 @@
                 <button class="link" data-run="mascotGuide">Mascot guide</button>
                 <button class="link" data-run="mascotsFolder">Open your mascots folder</button>
             </div>`,
-            h`${ws("mascot")}${when(true)}`);
+            ws("mascot"));
     }
 
     const currentMascot = () => state.mascots.find((x) => x.id === state.mascot) || state.mascots[0];
@@ -272,7 +255,6 @@
 
     function mindSection() {
         const current = currentModel();
-        const live = state.session === "active" && state.liveProvider === state.provider;
         const own = state.provider === "openai" && !onOpenAI() && !onPlan();   // another provider's models: named, or picked from its list
         const models = state.models.map((m) => {
             const on = sameModel(m.id, current);
@@ -285,14 +267,13 @@
         });
         const effort = state.values.effort;
         const e = EFFORTS.find(([v]) => v === effort) || EFFORTS[0];
-        const lede = onCopilot() ? "The model Euterpe thinks with: Copilot sets how hard it thinks." : "The model Euterpe thinks with, and how hard.";
         const another = claude() ? "Another model Claude Code knows" : onPlan() ? "Another model your plan offers" : onOpenAI() ? "Another model OpenAI's API knows" : "The model, as your provider names it";
         const ids = own && listed && listed.ids ? listed.ids : null;
         const signedOut = onPlan() && !state.api.account;
         const copilotProblem = onCopilot() && state.copilot && state.copilot.problem;
-        return section("mind", "Mind", "How Euterpe thinks", lede,
+        return section("mind", "Mind", "How Euterpe thinks", "",
             h`<div class="field">
-                <div class="field-label">Model ${ws(modelKey())} ${when(live)}</div>
+                <div class="field-label">Model ${ws(modelKey())}</div>
                 ${models.length ? h`<div class="grid grid-choices">${models}</div>` : ""}
                 ${copilotProblem ? h`<p class="muted small">Copilot's models appear here once VS Code has them.</p>` : ""}
                 ${onCopilot() ? "" : signedOut ? h`<p class="muted small">Sign in with ChatGPT to see the models your plan offers.</p>` : h`<form class="other-model" data-form="model">
@@ -307,7 +288,7 @@
                 ${state.provider === "openai" && !current && !onPlan() ? h`<p class="small problem">Name the model Euterpe should think with: ${state.api.endpoint ? state.api.endpoint.name : "your provider"} has no default.</p>` : ""}
             </div>
             ${onCopilot() ? "" : h`<div class="field">
-                <div class="field-label">Effort ${ws("effort")} ${when(false)}</div>
+                <div class="field-label">Effort ${ws("effort")} ${later("effort")}</div>
                 <div class="segmented" role="group" aria-label="Effort">
                     ${EFFORTS.map(([v, name]) => h`<button data-set="effort" data-value="${v}" aria-pressed="${String(v === effort)}" data-focus="effort:${v}">${name}</button>`)}
                 </div>
@@ -344,7 +325,7 @@
         const plan = !!ep && ep.chatgpt;
         const how = !ep ? "" : plan ? " · the Responses API, on your ChatGPT plan, with web search" : ep.openai ? " · the Responses API, with web search" : " · Chat Completions";
         return h`<div class="field">
-                <div class="field-label">Provider ${when(false)}</div>
+                <div class="field-label">Provider</div>
                 <div class="grid grid-presets">${presets}</div>
                 ${custom ? h`<div class="path-input api-url">
                     <input id="api-url" type="text" spellcheck="false" autocomplete="off" value="${api.value}" placeholder="https://api.openai.com/v1" data-url="openaiBaseUrl" data-focus="api-url" aria-label="The API's base URL">
@@ -352,7 +333,7 @@
                 ${api.problem ? h`<p class="small problem">${api.problem}</p>` : ep ? h`<p class="small muted path-hint">${ep.baseURL}${how}</p>` : ""}
             </div>
             ${plan ? accountField() : h`<div class="field">
-                <div class="field-label">API key ${when(false)}</div>
+                <div class="field-label">API key</div>
                 ${key}
                 <p class="muted small">${api.key === "local" ? "Your writing stays on this computer, with the model."
                     : "Kept in VS Code's secret storage, and only ever sent to the address it's for. Your writing goes there too: what Euterpe reads, it sends to the model."}</p>
@@ -362,13 +343,12 @@
     /** GitHub Copilot, as VS Code has it: its models, or the way to its sign-in. */
     function copilotField() {
         const problem = state.copilot && state.copilot.problem;
-        const n = state.models.length;
+        const account = state.copilot && state.copilot.account;
         return h`<div class="field">
-                <div class="field-label">GitHub Copilot ${when(false)}</div>
+                <div class="field-label">GitHub Copilot</div>
                 ${problem ? h`<p class="key-line"><span class="key-dot key-missing" aria-hidden="true"></span>${problem}
                     <button class="btn" data-run="setUpCopilot">Set Up Copilot…</button></p>`
-                    : h`<p class="key-line"><span class="key-dot key-set" aria-hidden="true"></span>Signed in: Copilot offers Euterpe ${n} ${n === 1 ? "model" : "models"}.</p>`}
-                <p class="muted small">VS Code asks once whether Euterpe may use Copilot's models. Euterpe's requests count toward your plan's usage, with no key. What Euterpe reads, your writing included, goes to GitHub Copilot.</p>
+                    : h`<p class="key-line"><span class="key-dot key-set" aria-hidden="true"></span><span>Signed in${account ? h` as <strong>${account}</strong>` : ""}.</span></p>`}
             </div>`;
     }
 
@@ -383,15 +363,15 @@
                 <button class="btn" data-run="signIn">Continue with ChatGPT…</button></p>`;
         const usage = "Euterpe's requests count toward your plan's usage limits, with no API key, and you can limit Euterpe's share in ChatGPT's settings. What Euterpe reads, your writing included, goes to OpenAI.";
         return h`<div class="field">
-                <div class="field-label">ChatGPT account ${when(false)}</div>
+                <div class="field-label">ChatGPT account</div>
                 ${line}
                 <p class="muted small">${a ? usage : `Your browser opens ChatGPT's sign-in, where you let Euterpe use your plan: ChatGPT Plus or Pro. ${usage}`}</p>
             </div>`;
     }
 
-    /** Already the choice (a persona file in the way can still be cleared by picking one). */
+    /** Already the choice. */
     function isCurrent(key, value) {
-        if (key === "persona") return !state.personaFile && value === state.persona;
+        if (key === "persona") return value === state.persona;
         if (key === "mascot") return value === state.mascot;
         if (key === "model" || key === "openaiModel" || key === "copilotModel") return sameModel(value, currentModel());
         if (key === "openaiBaseUrl") return !otherUrl && value === state.values.openaiBaseUrl;
@@ -403,15 +383,9 @@
     // ---------- reading along ----------
     function readingSection() {
         const attention = state.values.attention;
-        const ep = state.api.endpoint;
-        const cost = claude() ? "Each look is a short turn on your Claude login, mostly served from the prompt cache: fewer looks cost less of your usage."
-            : onCopilot() ? "Each look is a short request on your GitHub Copilot plan, counted toward its usage: fewer looks spend less of it."
-            : ep && ep.local ? `Each look is a short request to ${ep.name}, on this computer: fewer looks, less work for it.`
-            : ep && ep.chatgpt ? "Each look is a short request on your ChatGPT plan, counted toward its usage limits: fewer looks spend less of them."
-            : `Each look is a short request to ${ep ? ep.name : "the API"}, billed to your API key and mostly served from its prompt cache: fewer looks cost less.`;
-        return section("reading", "Reading along", "How Euterpe reads along", cost,
+        return section("reading", "Reading along", "How Euterpe reads along", "",
             h`<div class="field">
-                <div class="field-label">Attention ${ws("attention")} ${when(false)}</div>
+                <div class="field-label">Attention ${ws("attention")} ${later("attention")}</div>
                 <div class="grid grid-choices">${ATTENTION.map(([v, name, desc]) => h`<div class="card choice${v === attention ? " is-current" : ""}">
                     <button class="card-main" data-set="attention" data-value="${v}" aria-pressed="${String(v === attention)}" data-focus="attention:${v}">
                         <span class="card-title">${name}</span>
@@ -429,7 +403,7 @@
         return h`<label class="switch">
             <input type="checkbox" role="switch" data-toggle="${key}" ${on ? "checked" : ""} data-focus="toggle:${key}">
             <span class="switch-track" aria-hidden="true"></span>
-            <span class="switch-text"><span class="switch-label">${label} ${ws(key)} ${when(false)}</span><span class="muted small">${desc}</span></span>
+            <span class="switch-text"><span class="switch-label">${label} ${ws(key)} ${later(key)}</span><span class="muted small">${desc}</span></span>
         </label>`;
     }
 

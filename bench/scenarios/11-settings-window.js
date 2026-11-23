@@ -77,52 +77,24 @@ module.exports = {
             },
         },
         {
-            id: "settings-persona-file",
-            title: "A persona file in the way",
-            summary: "euterpe.personaFile is set: a persona anywhere on disk wins over the ones listed. Then it points at a file that can't be read.",
-            world: { files: { "~/Dropbox/euterpe/me.md": "---\nname: Mine\ndescription: The one I sync.\n---\nYou are blunt.\n" }, settings: { personaFile: "{home}/Dropbox/euterpe/me.md" } },
-            async run(t) {
-                await open(t);
-                await t.screen("notice", "euterpe.personaFile wins", "A notice above the personas, with a way to stop using the file; no persona is framed as current.");
-                await t.set("personaFile", require("path").join(t.world.home, "Dropbox", "euterpe", "gone.md"));
-                await t.wait(800);
-                await t.screen("broken", "A persona file that can't be read", "");
-            },
-        },
-        {
             id: "settings-session",
             title: "The settings window during a session",
-            summary: "During a session: which changes take effect at once, and which wait for the next session.",
+            summary: "During a session, the writer picks another persona and another size, which wait for the next session; then another mind.",
             world: {},
             async run(t) {
                 await startSession(t);
                 await open(t);
-                await t.screen("header", "Writing with you", "The header says a session is on; each field says when a change to it lands.");
+                await t.webview.do("click", '[data-set="persona"][data-value="warm"]');
+                await t.wait(600);
+                await t.screen("persona", "Another persona: from the next session", "Only once the pick differs from what the session started with; picking that one again takes the note away.");
                 await t.webview.do("scroll", "#mascot");
-                await t.screen("chips", "Changes at once, or from the next session", "");
+                await t.webview.do("click", '[data-set="avatarScale"][data-value="3"]');
+                await t.wait(600);
+                await t.screen("size", "Another size: from the next session", "A mascot changes at once: no note.");
                 await t.webview.do("click", '[data-set="provider"][data-value="openai"]');
                 await t.webview.do("top");
                 await t.wait(800);
                 await t.screen("other-mind", "The switch is for the next session", "Switching the mind during a session on Claude: the window shows the next session's settings, and says this one stays on Claude.");
-            },
-        },
-        {
-            id: "settings-starting",
-            title: "The settings window while Euterpe is on the way",
-            summary: "The header while a session starts.",
-            world: { electron: "missing", electronDownload: { pauseAt: 0.3 } },
-            async run(t) {
-                await open(t);
-                // (a session starts on the document in front: the draft, then back to the window)
-                t.showTab("draft.md");
-                t.run("euterpe.startSession");
-                const dl = await t.modal({ text: /Electron/ });
-                dl.click("Download");
-                await t.progress({ title: /Downloading/ });
-                t.showTab("Euterpe Settings");
-                await t.wait(1000);
-                await t.screen("starting", "On the way…", "");
-                t.release("download");
             },
         },
         {
@@ -132,7 +104,7 @@ module.exports = {
             world: { trusted: false },
             async run(t) {
                 await open(t);
-                await t.screen("banner", "Restricted Mode", "The header's state, and a banner: everything works, but a session waits.");
+                await t.screen("banner", "Restricted Mode", "A banner: everything works, but a session waits.");
             },
         },
         {
@@ -153,7 +125,7 @@ module.exports = {
             summary: "Every path setting set to something that isn't there (or isn't what it should be).",
             world: {
                 files: { "~/euterpe-home": "not a folder" },
-                settings: { homeDir: "{home}/euterpe-home", claudeConfigDir: "~/.claude-work", claudePath: "{home}/tools/claude.exe", electronPath: "{home}/tools/electron.exe", personaFile: "{home}/gone.md" },
+                settings: { homeDir: "{home}/euterpe-home", claudeConfigDir: "~/.claude-work", claudePath: "{home}/tools/claude.exe" },
             },
             async run(t) {
                 await open(t);
@@ -185,7 +157,7 @@ module.exports = {
                 await open(t);
                 await t.webview.do("open-setup");
                 await t.webview.do("scroll", "#setup");
-                for (const key of ["homeDir", "claudeConfigDir", "claudePath", "electronPath", "personaFile"]) {
+                for (const key of ["homeDir", "claudeConfigDir", "claudePath"]) {
                     await t.webview.do("click", `[data-run="browse"][data-arg="${key}"]`);
                     const d = await t.dialog();
                     await t.screen(`browse-${key}`, `Browse for ${key}`, "The system's dialog (the bench's stand-in), with the title Euterpe gives it.");

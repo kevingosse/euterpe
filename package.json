@@ -411,17 +411,10 @@
             "order": 4,
             "markdownDescription": "An Electron executable for Euterpe's avatar window, for machines that can't download it (offline, managed). Empty: Euterpe downloads Electron 44 once, into its own storage. User settings only."
           },
-          "euterpe.personaFile": {
-            "type": "string",
-            "default": "",
-            "scope": "machine",
-            "order": 5,
-            "markdownDescription": "A persona Markdown file anywhere on disk, instead of `#euterpe.persona#`. User settings only: the persona becomes part of the instructions of an agent that runs commands without asking, so a workspace can't set it."
-          },
           "euterpe.debugMind": {
             "type": "boolean",
             "default": false,
-            "order": 6,
+            "order": 5,
             "markdownDescription": "Debug the mind: an **Euterpe Mind** terminal shows a live, readable transcript (perceptions, replies, tool calls, each turn's cache and token usage; type into it to talk to Euterpe), and the raw stream-json traffic goes to the Euterpe log."
           }
         }

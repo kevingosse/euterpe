@@ -102,6 +102,8 @@ export class WritingSession implements vscode.Disposable {
     /** The session's own files (prompt, settings, tool config): private to the writer, removed at the end. */
     private tmpDir = "";
     private mascot: Mascot = CLAWD;
+    /** What it started with of the settings only a new session takes on (the settings window tells the writer). */
+    startedWith: StartedWith | null = null;
     private ending: Promise<void> | null = null;
     private finished = false;
     /** The writer is being asked to sign in again (the mind's sign-in ended), and why. */
@@ -131,6 +133,14 @@ export class WritingSession implements vscode.Disposable {
         const attention = attentionFor(cfg.get<string>("attention"));
         const persona = this.choosePersona(cfg, home);
         log(`persona: ${persona.name} (${persona.bundled ? "bundled" : persona.file})`);
+        this.startedWith = {
+            persona: persona.id,
+            avatarScale: cfg.get<number>("avatarScale") ?? 4,
+            effort: cfg.get<string>("effort") ?? "",
+            attention: cfg.get<string>("attention") ?? "",
+            followActiveEditor: cfg.get<boolean>("followActiveEditor") ?? true,
+            debugMind: cfg.get<boolean>("debugMind") ?? false,
+        };
         const bundledMascots = path.join(this.extensionRoot, "mascots");
         const { mascot, missing } = chooseMascot(cfg.get<string>("mascot") ?? "", bundledMascots, path.join(home, "mascots"), provider);
         if (missing) { log(`mascot "${missing}" isn't in ${path.join(home, "mascots")} or among the bundled ones: ${mascot.name} instead`); }
@@ -568,11 +578,10 @@ export class WritingSession implements vscode.Disposable {
         }
     }
 
-    /** euterpe.personaFile if set, else euterpe.persona (the writer's own, or a bundled one), else the default. */
+    /** euterpe.persona (the writer's own, or a bundled one), else the default. */
     private choosePersona(cfg: vscode.WorkspaceConfiguration, home: string): Persona {
-        const file = cfg.get<string>("personaFile")?.trim() ?? "";
         const mine = path.join(home, "personas");
-        const { persona, missing } = choosePersona(file && expandHome(file), cfg.get<string>("persona") ?? "", path.join(this.locate("mind"), "personas"), mine);
+        const { persona, missing } = choosePersona(cfg.get<string>("persona") ?? "", path.join(this.locate("mind"), "personas"), mine);
         if (missing) { this.hooks.log(`persona "${missing}" isn't in ${mine} or among the bundled ones: ${persona.name} instead`); }
         return persona;
     }
@@ -590,6 +599,16 @@ export class WritingSession implements vscode.Disposable {
         if (carried.length) { this.hooks.log(`carried over from your Claude settings: ${carried.join(", ")}`); }
         return settings;
     }
+}
+
+/** The settings a session takes on when it starts, as it started with them. */
+export interface StartedWith {
+    persona: string;
+    avatarScale: number;
+    effort: string;
+    attention: string;
+    followActiveEditor: boolean;
+    debugMind: boolean;
 }
 
 /** What a session runs on, found before it starts (see extension.ts). */

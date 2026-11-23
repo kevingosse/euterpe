@@ -68,8 +68,8 @@ module.exports = {
         {
             id: "check-claude-signed-out",
             title: "Claude Code isn't signed in",
-            summary: "Claude Code is there, but signed out; and a persona file that can't be read.",
-            world: { claude: { auth: { loggedIn: false } }, settings: { personaFile: "{home}/personas/gone.md" } },
+            summary: "Claude Code is there, but signed out.",
+            world: { claude: { auth: { loggedIn: false } } },
             async run(t) { await check(t, "signed-out", "Signed out", ""); },
         },
         {
