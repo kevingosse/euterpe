@@ -113,7 +113,7 @@ module.exports = {
                 await t.overlay.do("text-menu", "#chat-input", false);
                 await t.screen("input", "Right-click in the chat's input", "Cut, Copy, Paste and Select All are Electron's own labels for its menu roles.");
                 await t.overlay.do("pick", null);
-                await t.screen("chat", "The chat, made bigger earlier", "The ⇲ by the close button puts it back to its default size. It shows only once the chat has been resized (the window remembers its place and size).");
+                await t.screen("chat", "The chat, made bigger earlier", "The arrow by the close button puts it back to its default size. It shows only once the chat has been resized (the window remembers its place and size).");
             },
         },
         {

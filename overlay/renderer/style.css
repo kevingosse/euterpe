@@ -201,6 +201,20 @@ html, body {
     opacity: 0.8;
 }
 #chat-close:hover, #chat-default-size:hover { opacity: 1; }
+/* A pixel arrow toward Clawd's corner, drawn on the resize grip's 2px grid. */
+#chat-default-size { align-self: center; position: relative; width: 10px; height: 10px; padding: 0; }
+#chat-default-size::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 2px;
+    height: 2px;
+    background: var(--cream);
+    box-shadow:
+        2px 2px var(--cream), 4px 4px var(--cream), 6px 6px var(--cream), 8px 8px var(--cream),
+        8px 4px var(--cream), 8px 6px var(--cream), 4px 8px var(--cream), 6px 8px var(--cream);
+}
 
 #chat-log {
     flex: 1;
