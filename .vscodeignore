@@ -12,6 +12,7 @@
 !media/euterpe-icons.ttf
 !media/icon.png
 !media/icon-openai.png
+!media/icon-copilot.png
 !overlay/package.json
 !overlay/main.js
 !overlay/preload.js

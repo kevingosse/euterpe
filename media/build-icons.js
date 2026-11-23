@@ -78,11 +78,12 @@ fs.writeFileSync(out, Buffer.from(ttf.buffer));
 console.log(`wrote ${out}: ${Object.keys(MARKS).map((n) => `${n} \\${MARKS[n].code.toString(16).toUpperCase()}`).join(", ")}`);
 
 // ---------- the extension's icon (media/icon.png, for the Marketplace): the same mark, 32 × 32 pixels at 4× ----------
-// media/icon-openai.png is the same in ink blue: the settings window wears it for a mind that isn't on Claude.
+// The settings window wears it in the mind's provider's colour: media/icon-openai.png in ink blue, media/icon-copilot.png in GitHub's purple.
 
 const PALETTE = { ".": null, t: [0xd9, 0x77, 0x57], T: [0xa8, 0x4d, 0x33], c: [0xff, 0xf5, 0xe2], i: [0x2b, 0x22, 0x33], b: [0xf4, 0x9a, 0xab] };
 
 const BLUE = { ...PALETTE, t: [0x4e, 0x73, 0xd2], T: [0x2e, 0x48, 0x93] };
+const PURPLE = { ...PALETTE, t: [0x82, 0x50, 0xdf], T: [0x66, 0x39, 0xba] };
 
 function iconRows() {
     const N = 32, g = Array.from({ length: N }, () => Array(N).fill("."));
@@ -132,7 +133,7 @@ function png(rows, scale, palette = PALETTE) {
     return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
 }
 
-for (const [name, palette] of [["icon.png", PALETTE], ["icon-openai.png", BLUE]]) {
+for (const [name, palette] of [["icon.png", PALETTE], ["icon-openai.png", BLUE], ["icon-copilot.png", PURPLE]]) {
     const icon = path.join(__dirname, name);
     fs.writeFileSync(icon, png(iconRows(), 4, palette));
     console.log(`wrote ${icon}`);

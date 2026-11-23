@@ -37,6 +37,7 @@
     const PROVIDERS = [
         ["claude", "Claude", "Claude, through Claude Code, on your Claude login: a subscription or an API key."],
         ["openai", "OpenAI & others", "Your ChatGPT plan, OpenAI's API, or any OpenAI-compatible one (OpenRouter, a local Ollama or LM Studio…). Clawd stays with Claude."],
+        ["copilot", "GitHub Copilot", "Your GitHub Copilot plan: the models Copilot offers you in VS Code. Clawd stays with Claude."],
     ];
     // One click to a provider (src/providers.ts PRESETS); any other OpenAI-compatible address works too.
     // The ChatGPT plan is the setting's default (""): it's OpenAI's API too, signed in rather than keyed.
@@ -83,7 +84,7 @@
         if (!state) return;
         const focus = focused();
         stashPuppets();
-        document.body.classList.toggle("provider-openai", state.provider === "openai");
+        for (const p of ["openai", "copilot"]) document.body.classList.toggle(`provider-${p}`, state.provider === p);   // (the provider's colour)
         app.innerHTML = piece(h`
             ${header()}
             ${providerSwitch()}
@@ -113,7 +114,7 @@
             : state.session === "starting" ? ["starting", "On the way…"]
             : ["none", "Not in a session"];
         return h`<header class="top">
-            <img class="mark" src="${state.provider === "openai" ? app.dataset.iconOpenai : app.dataset.icon}" alt="" width="44" height="44">
+            <img class="mark" src="${claude() ? app.dataset.icon : onCopilot() ? app.dataset.iconCopilot : app.dataset.iconOpenai}" alt="" width="44" height="44">
             <div class="title">
                 <h1>Euterpe</h1>
                 <p class="muted">Who your writing companion is, how it looks, and how it thinks. Changes save as you make them.</p>
@@ -122,17 +123,24 @@
         </header>`;
     }
 
-    /** What the mind runs on: everything below follows it, colours included. */
+    /**
+     * What the mind runs on: everything below follows it, colours included. Right under it, what it
+     * takes: the API and its key, the ChatGPT sign-in, Copilot in VS Code (Claude Code has its own login).
+     */
     function providerSwitch() {
         const p = PROVIDERS.find(([v]) => v === state.provider) || PROVIDERS[0];
         const other = state.session === "active" && state.liveProvider && state.liveProvider !== state.provider;
         const liveName = other ? (PROVIDERS.find(([v]) => v === state.liveProvider) || PROVIDERS[0])[1] : "";
-        return h`<div class="provider" role="group" aria-labelledby="provider-label">
-            <span class="provider-label" id="provider-label">Mind</span>
-            <div class="segmented segmented-big">
-                ${PROVIDERS.map(([v, name]) => h`<button data-set="provider" data-value="${v}" aria-pressed="${String(v === state.provider)}" data-focus="provider:${v}">${name}</button>`)}
+        const access = state.provider === "openai" ? apiFields() : onCopilot() ? copilotField() : "";
+        return h`<div id="provider" class="provider-block">
+            <div class="provider" role="group" aria-labelledby="provider-label">
+                <span class="provider-label" id="provider-label">Mind</span>
+                <div class="segmented segmented-big">
+                    ${PROVIDERS.map(([v, name]) => h`<button data-set="provider" data-value="${v}" aria-pressed="${String(v === state.provider)}" data-focus="provider:${v}">${name}</button>`)}
+                </div>
+                <p class="muted small provider-desc">${p[2]} ${ws("provider")}${other ? h` <strong>This session stays on ${liveName}: the switch is for the next one.</strong>` : ""}</p>
             </div>
-            <p class="muted small provider-desc">${p[2]} ${ws("provider")}${other ? h` <strong>This session stays on ${liveName}: the switch is for the next one.</strong>` : ""}</p>
+            ${access ? h`<div class="access">${access}</div>` : ""}
         </div>`;
     }
 
@@ -252,9 +260,10 @@
 
     // ---------- mind ----------
     const claude = () => state.provider === "claude";
-    const modelKey = () => (claude() ? "model" : "openaiModel");
-    const onOpenAI = () => !!(state.api.endpoint && state.api.endpoint.openai);
-    const onPlan = () => !claude() && !!(state.api.endpoint && state.api.endpoint.chatgpt);
+    const onCopilot = () => state.provider === "copilot";
+    const modelKey = () => (claude() ? "model" : onCopilot() ? "copilotModel" : "openaiModel");
+    const onOpenAI = () => state.provider === "openai" && !!(state.api.endpoint && state.api.endpoint.openai);
+    const onPlan = () => state.provider === "openai" && !!(state.api.endpoint && state.api.endpoint.chatgpt);
     /** The model the next turn runs on: the live one, else the setting (empty: the provider's default, if it has one). */
     function currentModel() {
         if (state.liveModel !== undefined) return state.liveModel;
@@ -264,7 +273,7 @@
     function mindSection() {
         const current = currentModel();
         const live = state.session === "active" && state.liveProvider === state.provider;
-        const own = !claude() && !onOpenAI() && !onPlan();   // another provider's models: named, or picked from its list
+        const own = state.provider === "openai" && !onOpenAI() && !onPlan();   // another provider's models: named, or picked from its list
         const models = state.models.map((m) => {
             const on = sameModel(m.id, current);
             return h`<div class="card choice${on ? " is-current" : ""}">
@@ -276,18 +285,17 @@
         });
         const effort = state.values.effort;
         const e = EFFORTS.find(([v]) => v === effort) || EFFORTS[0];
-        const lede = claude() ? "Euterpe's mind is Claude, through your own Claude Code login."
-            : onPlan() ? "Euterpe's mind runs here in VS Code, on your ChatGPT plan: you sign in with ChatGPT, no API key."
-            : "Euterpe's mind runs here in VS Code, on an OpenAI-compatible API, with your own key: OpenAI's, or another provider's.";
+        const lede = onCopilot() ? "The model Euterpe thinks with: Copilot sets how hard it thinks." : "The model Euterpe thinks with, and how hard.";
         const another = claude() ? "Another model Claude Code knows" : onPlan() ? "Another model your plan offers" : onOpenAI() ? "Another model OpenAI's API knows" : "The model, as your provider names it";
         const ids = own && listed && listed.ids ? listed.ids : null;
         const signedOut = onPlan() && !state.api.account;
+        const copilotProblem = onCopilot() && state.copilot && state.copilot.problem;
         return section("mind", "Mind", "How Euterpe thinks", lede,
-            h`${claude() ? "" : apiFields()}
-            <div class="field">
+            h`<div class="field">
                 <div class="field-label">Model ${ws(modelKey())} ${when(live)}</div>
                 ${models.length ? h`<div class="grid grid-choices">${models}</div>` : ""}
-                ${signedOut ? h`<p class="muted small">Sign in with ChatGPT to see the models your plan offers.</p>` : h`<form class="other-model" data-form="model">
+                ${copilotProblem ? h`<p class="muted small">Copilot's models appear here once VS Code has them.</p>` : ""}
+                ${onCopilot() ? "" : signedOut ? h`<p class="muted small">Sign in with ChatGPT to see the models your plan offers.</p>` : h`<form class="other-model" data-form="model">
                     <label for="other-model">${another}</label>
                     <input id="other-model" type="text" spellcheck="false" autocomplete="off" placeholder="${claude() ? "model name" : onOpenAI() || onPlan() ? "gpt-5.6-sol" : "model id"}" data-focus="other-model"${ids ? raw(' list="api-models"') : ""}>
                     <button class="btn" type="submit">Use It</button>
@@ -296,15 +304,15 @@
                 ${ids ? h`<datalist id="api-models">${ids.map((id) => h`<option value="${id}"></option>`)}</datalist>` : ""}
                 ${own && listed && listed.problem ? h`<p class="small problem">${listed.problem}</p>` : ""}
                 ${onPlan() && state.api.modelsProblem ? h`<p class="small problem">${state.api.modelsProblem}</p>` : ""}
-                ${!claude() && !current && !onPlan() ? h`<p class="small problem">Name the model Euterpe should think with: ${state.api.endpoint ? state.api.endpoint.name : "your provider"} has no default.</p>` : ""}
+                ${state.provider === "openai" && !current && !onPlan() ? h`<p class="small problem">Name the model Euterpe should think with: ${state.api.endpoint ? state.api.endpoint.name : "your provider"} has no default.</p>` : ""}
             </div>
-            <div class="field">
+            ${onCopilot() ? "" : h`<div class="field">
                 <div class="field-label">Effort ${ws("effort")} ${when(false)}</div>
                 <div class="segmented" role="group" aria-label="Effort">
                     ${EFFORTS.map(([v, name]) => h`<button data-set="effort" data-value="${v}" aria-pressed="${String(v === effort)}" data-focus="effort:${v}">${name}</button>`)}
                 </div>
                 <p class="muted small">How hard Euterpe thinks before each turn. ${e[2]}${claude() ? "" : " Not every model takes every level: Euterpe moves to the nearest one it does."}</p>
-            </div>`);
+            </div>`}`);
     }
 
     /** Where the API is, and its key (kept by VS Code, never shown here). */
@@ -351,6 +359,19 @@
             </div>`}`;
     }
 
+    /** GitHub Copilot, as VS Code has it: its models, or the way to its sign-in. */
+    function copilotField() {
+        const problem = state.copilot && state.copilot.problem;
+        const n = state.models.length;
+        return h`<div class="field">
+                <div class="field-label">GitHub Copilot ${when(false)}</div>
+                ${problem ? h`<p class="key-line"><span class="key-dot key-missing" aria-hidden="true"></span>${problem}
+                    <button class="btn" data-run="setUpCopilot">Set Up Copilot…</button></p>`
+                    : h`<p class="key-line"><span class="key-dot key-set" aria-hidden="true"></span>Signed in: Copilot offers Euterpe ${n} ${n === 1 ? "model" : "models"}.</p>`}
+                <p class="muted small">VS Code asks once whether Euterpe may use Copilot's models. Euterpe's requests count toward your plan's usage, with no key. What Euterpe reads, your writing included, goes to GitHub Copilot.</p>
+            </div>`;
+    }
+
     /** The ChatGPT plan: who's signed in (the tokens stay in VS Code's secret storage). */
     function accountField() {
         const api = state.api, a = api.account;
@@ -372,7 +393,7 @@
     function isCurrent(key, value) {
         if (key === "persona") return !state.personaFile && value === state.persona;
         if (key === "mascot") return value === state.mascot;
-        if (key === "model" || key === "openaiModel") return sameModel(value, currentModel());
+        if (key === "model" || key === "openaiModel" || key === "copilotModel") return sameModel(value, currentModel());
         if (key === "openaiBaseUrl") return !otherUrl && value === state.values.openaiBaseUrl;
         return value === state.values[key];
     }
@@ -384,6 +405,7 @@
         const attention = state.values.attention;
         const ep = state.api.endpoint;
         const cost = claude() ? "Each look is a short turn on your Claude login, mostly served from the prompt cache: fewer looks cost less of your usage."
+            : onCopilot() ? "Each look is a short request on your GitHub Copilot plan, counted toward its usage: fewer looks spend less of it."
             : ep && ep.local ? `Each look is a short request to ${ep.name}, on this computer: fewer looks, less work for it.`
             : ep && ep.chatgpt ? "Each look is a short request on your ChatGPT plan, counted toward its usage limits: fewer looks spend less of them."
             : `Each look is a short request to ${ep ? ep.name : "the API"}, billed to your API key and mostly served from its prompt cache: fewer looks cost less.`;
@@ -478,7 +500,7 @@
             const key = t.dataset.set, value = t.dataset.type === "number" ? +t.dataset.value : t.dataset.value;
             if (isCurrent(key, value)) return;
             if (key === "mascot") cheer(value);
-            if (key === "model" || key === "openaiModel") state.liveModel = undefined;
+            if (key === "model" || key === "openaiModel" || key === "copilotModel") state.liveModel = undefined;
             if (key === "openaiBaseUrl") otherUrl = false;
             if (key === "provider") { state.liveModel = undefined; listed = null; otherUrl = false; }
             set(key, value);

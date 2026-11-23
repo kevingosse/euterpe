@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
-import { CLAUDE_DEFAULT_MODEL, defaultModel, MODELS, modelName, modelsFor, OPENAI_DEFAULT_MODEL, OPENAI_MODELS, sameModel } from "../models";
+import { CLAUDE_DEFAULT_MODEL, defaultModel, MODELS, modelName, modelSetting, modelsFor, OPENAI_DEFAULT_MODEL, OPENAI_MODELS, sameModel } from "../models";
 
 test("a model goes by its name, whatever its spelling", () => {
     assert.equal(modelName("sonnet"), "Sonnet");
@@ -30,4 +30,10 @@ test("OpenAI's picks, and what an empty setting means on each provider", () => {
     assert.equal(modelName(OPENAI_MODELS[0].id, "openai"), OPENAI_MODELS[0].name);
     assert.equal(modelName("llama3.3:70b", "openai"), "llama3.3:70b");
     assert.equal(modelName("", "openai"), "no model yet");
+});
+
+test("GitHub Copilot's models are its own: no picks, no default, a setting of their own", () => {
+    assert.deepEqual(modelsFor("copilot"), []);
+    assert.equal(defaultModel("copilot", true), "", "Euterpe picks among the models Copilot offers (copilotDefault)");
+    assert.deepEqual(["claude", "openai", "copilot"].map((p) => modelSetting(p as "claude")), ["model", "openaiModel", "copilotModel"]);
 });

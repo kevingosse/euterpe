@@ -9,6 +9,7 @@ import * as vscode from "vscode";
 import { ChatGptLogin, EndedLogin, planDefault, PlanModel, SignInNeeded } from "./chatgpt";
 import { resolveClaude } from "./claudeCli";
 import { buildMindEnv } from "./claudeMind";
+import { copilotDefault, CopilotModel } from "./copilot";
 import { ELECTRON_VERSION, findElectron } from "./electronRuntime";
 import { defaultModel, modelName, sameModel } from "./models";
 import { apiClient } from "./openaiMind";
@@ -29,6 +30,9 @@ export interface SetupContext {
     chatgptLogin(): Promise<ChatGptLogin | undefined>;
     chatgptEnded(): Promise<EndedLogin | undefined>;
     planModels(): Promise<PlanModel[]>;
+    /** The models GitHub Copilot offers in VS Code, and whether VS Code lets Euterpe use one (undefined: it hasn't asked yet). */
+    copilotModels(): Promise<CopilotModel[]>;
+    copilotAccess(id: string): Promise<boolean | undefined>;
 }
 
 interface Line { ok: boolean; text: string }
@@ -47,8 +51,11 @@ export async function checkSetup(ctx: SetupContext): Promise<void> {
             add(false, "This folder isn't trusted (Restricted Mode): a session waits until you trust it, since Euterpe's mind reads its files with permission prompts off.");
         }
 
-        if (providerFor(cfg.get("provider")) === "claude") {
+        const provider = providerFor(cfg.get("provider"));
+        if (provider === "claude") {
             await checkClaude(cfg, ctx, add);
+        } else if (provider === "copilot") {
+            await checkCopilot(cfg, ctx, add);
         } else {
             await checkApi(cfg, ctx, add);
         }
@@ -203,6 +210,32 @@ async function checkPlan(cfg: vscode.WorkspaceConfiguration, ctx: SetupContext, 
     const model = models.find((m) => sameModel(m.id, chosen || planDefault(models) || ""));
     add(!!model, model ? `Model: ${model.name}${chosen ? "" : " (Euterpe's pick on your plan)"}`
         : `Your plan doesn't offer the model ${chosen} (it offers ${models.map((m) => m.id).join(", ")}): choose another in Euterpe's settings.`);
+}
+
+/** GitHub Copilot: the models it offers in VS Code, the one Euterpe would use, and whether VS Code lets it. */
+async function checkCopilot(cfg: vscode.WorkspaceConfiguration, ctx: SetupContext, add: Add): Promise<void> {
+    let models: CopilotModel[];
+    try {
+        models = await ctx.copilotModels();
+    } catch (err) {
+        add(false, (err as Error).message);
+        return;
+    }
+    if (!models.length) {
+        add(false, "GitHub Copilot offers Euterpe no models: sign in to GitHub Copilot in VS Code first.");
+        return;
+    }
+    add(true, `Mind: GitHub Copilot (${models.length} ${models.length === 1 ? "model" : "models"})`);
+    const chosen = (cfg.get<string>("copilotModel") ?? "").trim();
+    const model = models.find((m) => sameModel(m.id, chosen || copilotDefault(models) || ""));
+    if (!model) {
+        add(false, `GitHub Copilot doesn't offer the model ${chosen} here: choose another in Euterpe's settings.`);
+        return;
+    }
+    add(true, `Model: ${model.name}${chosen ? "" : " (Euterpe's pick)"}`);
+    if (await ctx.copilotAccess(model.id).catch(() => undefined) === false) {
+        add(false, "VS Code doesn't let Euterpe use GitHub Copilot's models: you declined when it asked.");
+    }
 }
 
 /** `claude auth status` (JSON): null if it couldn't say. */

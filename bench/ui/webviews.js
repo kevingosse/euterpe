@@ -101,9 +101,13 @@ function validationBubble(frame, field) {
     const b = el("div", { class: "validation-bubble", "data-surface": "settings-window", "data-role": "validation", text: msg });
     Object.assign(b.style, { position: "absolute", left: `${f.left + r.left - d.left}px`, top: `${f.top + r.bottom + 6 - d.top}px`, zIndex: "9000", background: "#fff", color: "#222", border: "1px solid #999", borderRadius: "4px", padding: "6px 10px", font: "13px 'Segoe UI', sans-serif", boxShadow: "0 4px 14px #0006", maxWidth: "420px" });
     desk.append(b);
-    // gone once the field changes, as Chromium's (which also fades after a few seconds: this one
-    // stays, to be read and commented on)
-    field.addEventListener("input", () => b.remove(), { once: true });
+    // gone once the field changes, the page scrolls or the field is drawn anew, as Chromium's (which
+    // also fades after a few seconds: this one stays, to be read and commented on)
+    const redrawn = new MutationObserver(() => { if (!field.isConnected) { gone(); } });
+    const gone = () => { b.remove(); redrawn.disconnect(); };
+    field.addEventListener("input", gone, { once: true });
+    frame.contentWindow.addEventListener("scroll", gone, { once: true });
+    redrawn.observe(frame.contentDocument.body, { childList: true, subtree: true });
 }
 
 export function resetWebviews() {

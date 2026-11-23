@@ -179,11 +179,13 @@ inbox.on("mind-control", (m, env) => {
     router.events.emit("control", m);
     setTimeout(() => send("proc", { type: "control", reqId: m.reqId, error: refused }, { proc: env.from }), 250);
 });
-inbox.on("mind-info", (m) => {
+/** What the mind is given (its tools, as Claude Code lists them) and what a tool answered it. */
+router.info = (m) => {
     if (m.tools) { router.lastTools = m.tools.map((x) => ({ name: x.name, description: x.description, parameters: x.inputSchema })); router.builtinTools = m.builtin; }
     if (m.toolResult) { router.toolResults = [...(router.toolResults || []), m.toolResult]; }
     post({ type: "mind", op: "info", ...m });
-});
+};
+inbox.on("mind-info", (m) => router.info(m));
 
 // ---------- the world, and the extension in it ----------
 let world, wb, ext, extApi, context, driver;
@@ -242,6 +244,7 @@ async function start(init) {
     };
     wb = createVscode(bench);
     const net = createNetwork(world, router, log);
+    bench.network = net;   // (GitHub Copilot's turns, through vscode.lm, are answered there too)
     globalThis.fetch = net.fetch;
     const cp = createChildProcess(world, { spawned: (kind, file, args) => log(`runs ${kind === "claude" ? "Claude Code" : "Electron"}: ${file} ${args.join(" ").slice(0, 200)}`) });
     const zip = init.electronZip && fs.existsSync(init.electronZip) ? fs.readFileSync(init.electronZip) : Buffer.alloc(0);
@@ -284,6 +287,7 @@ async function start(init) {
             keys: async () => Object.keys(world.secrets),
             onDidChange: secretChange.event,
         },
+        languageModelAccessInformation: wb.languageModelAccess,
         extensionMode: T.ExtensionMode.Production,
         extension: { id: world.extId, extensionPath: extUri.fsPath, extensionUri: extUri, packageJSON: world.packageJSON, isActive: true },
         asAbsolutePath: (rel) => path.join(extUri.fsPath, rel),

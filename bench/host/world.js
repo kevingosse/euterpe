@@ -2,7 +2,8 @@
 // ~/.claude are), VS Code's storage for the extension, the extension's own folder, a workspace with
 // a draft, Claude Code where its installer would put it (a stand-in: see fake/claude.js), Electron
 // where Euterpe downloads it (see fake/electron-host.js), and what VS Code would know: the settings,
-// the secrets, the extension's remembered state, whether the folder is trusted.
+// the secrets, the extension's remembered state, whether the folder is trusted, the models GitHub
+// Copilot offers there.
 "use strict";
 
 const fs = require("fs");
@@ -25,6 +26,19 @@ The benchmark said the new allocator was 40% slower. The profiler said it wasn't
 
 I was actually pretty confident in my setup. BenchmarkDotNet, a dedicated machine, the CPU governor pinned to performance. What could go wrong?
 `;
+
+/**
+ * The models GitHub Copilot offers a writer signed in to it, as VS Code lists them
+ * (vscode.lm.selectChatModels): what a world has unless it says otherwise.
+ */
+const COPILOT_MODELS = [
+    { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", family: "claude-sonnet-4.5", version: "claude-sonnet-4.5", maxInputTokens: 128000 },
+    { id: "claude-haiku-4.5", name: "Claude Haiku 4.5", family: "claude-haiku-4.5", version: "claude-haiku-4.5", maxInputTokens: 128000 },
+    { id: "gpt-6.1-terra", name: "GPT-6.1 Terra", family: "gpt-6.1-terra", version: "gpt-6.1-terra-2026-09-18", maxInputTokens: 128000 },
+    { id: "gpt-6.1-sol", name: "GPT-6.1 Sol", family: "gpt-6.1-sol", version: "gpt-6.1-sol-2026-09-18", maxInputTokens: 128000 },
+    { id: "gpt-5-mini", name: "GPT-5 mini", family: "gpt-5-mini", version: "gpt-5-mini", maxInputTokens: 128000 },
+    { id: "gemini-3-pro", name: "Gemini 3 Pro", family: "gemini-3-pro", version: "gemini-3-pro-preview", maxInputTokens: 128000 },
+];
 
 /** The settings VS Code knows for Euterpe, from package.json: defaults and scopes. */
 function registry(unknown = []) {
@@ -138,6 +152,13 @@ function buildWorld(dir, spec = {}) {
     const globalState = { ...(spec.globalState || {}) };
     const secrets = { ...(spec.secrets || {}) };
 
+    // GitHub Copilot in VS Code: signed in, offering the bench's models, unless the scenario says
+    // otherwise (null: no Copilot here, or signed out of it; `models`: the ones it offers). `access`:
+    // whether VS Code lets Euterpe use them (true: allowed; false: declined; undefined: VS Code asks
+    // at Euterpe's first request). `error`: every request fails so ({ code: "Blocked", "NoPermissions",
+    // "NotFound" or none, message, cause }). `setUp`: the models signing in (VS Code's Copilot setup) brings.
+    const copilot = { models: spec.copilot === null ? [] : COPILOT_MODELS, access: undefined, error: null, setUp: COPILOT_MODELS, ...(spec.copilot || {}) };
+
     const world = {
         dir, home, appData, localAppData, temp, storage, userData, extRoot, euterpeHome, claudeDir, bin, workspaceDir: ws, electronDir,
         repo: REPO, extId: EXT_ID, version: PKG.version, packageJSON: PKG, electronVersion: ELECTRON_VERSION,
@@ -153,6 +174,7 @@ function buildWorld(dir, spec = {}) {
         applyEditFails: !!spec.applyEditFails,
         openExternalFails: !!spec.openExternalFails,
         claude,
+        copilot,
         where,
         fill,
         /** The files an open dialog offers: the scenario's, for that dialog's title. */
@@ -189,4 +211,4 @@ function buildWorld(dir, spec = {}) {
     return world;
 }
 
-module.exports = { buildWorld, REPO, PKG, EXT_ID, ELECTRON_VERSION, DRAFT };
+module.exports = { buildWorld, REPO, PKG, EXT_ID, ELECTRON_VERSION, DRAFT, COPILOT_MODELS };

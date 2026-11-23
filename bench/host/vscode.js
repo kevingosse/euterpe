@@ -1,7 +1,8 @@
 // A stand-in for the `vscode` module: the parts of VS Code's extension API that Euterpe uses,
 // behaving as VS Code does, with everything the writer would see sent to the bench's page
 // instead (notifications, dialogs, quick picks, input boxes, progress, the status bar, editors,
-// diffs, webviews, the output channel, terminals). The real extension runs against it unchanged.
+// diffs, webviews, the output channel, terminals), and GitHub Copilot's models as VS Code lends them
+// (vscode.lm, its consent dialog). The real extension runs against it unchanged.
 "use strict";
 
 const fs = require("fs");
@@ -26,7 +27,7 @@ function createVscode(bench) {
         activeEditor: new EventEmitter(), visibleEditors: new EventEmitter(), selection: new EventEmitter(), windowState: new EventEmitter(),
         docChange: new EventEmitter(), docSave: new EventEmitter(), docOpen: new EventEmitter(), docClose: new EventEmitter(),
         config: new EventEmitter(), trust: new EventEmitter(), tabs: new EventEmitter(), tabGroups: new EventEmitter(),
-        terminalOpen: new EventEmitter(), terminalClose: new EventEmitter(),
+        terminalOpen: new EventEmitter(), terminalClose: new EventEmitter(), lmModels: new EventEmitter(), lmAccess: new EventEmitter(),
     };
 
     // ---------- documents ----------
@@ -874,6 +875,7 @@ function createVscode(bench) {
         "workbench.action.openSettings": (query) => openPage({ kind: "settings-ui", query: typeof query === "string" ? query : (query?.query ?? "") }, "Settings", { kind: "page" }),
         "workbench.action.reloadWindow": () => bench.reload(),
         "workbench.action.openWalkthrough": () => { },
+        "workbench.action.chat.triggerSetup": () => copilotSetup(),
         "revealFileInOS": (uri) => ui.post({ type: "external", url: uriOf(uri).toString(), site: bench.site() }),
     };
     api.commands = {
@@ -889,6 +891,138 @@ function createVscode(bench) {
             return fn(...args);
         },
         async getCommands() { return [...commands.keys(), ...Object.keys(builtins)]; },
+    };
+
+    // ---------- the Language Model API: GitHub Copilot's models, lent to extensions ----------
+    // The world's (world.copilot), each a LanguageModelChat whose requests the network answers in Chat
+    // Completions, as it answers an API's (the turn router: the scenario, or the reviewer). An
+    // extension's first request asks the writer, in VS Code's own dialog, whether it may use them.
+    const COPILOT_VENDOR = "copilot", COPILOT_PROVIDER = "GitHub Copilot Chat";
+    const copilot = () => world.copilot;
+    const offers = (id) => (copilot().models || []).some((m) => m.id === id);
+
+    function chatModel(m) {
+        return {
+            id: m.id, name: m.name, vendor: COPILOT_VENDOR, family: m.family ?? m.id, version: m.version ?? m.id, maxInputTokens: m.maxInputTokens ?? 128000,
+            countTokens: async (x) => Math.ceil(String(typeof x === "string" ? x : (x?.content || []).map((p) => p?.value ?? "").join("")).length / 4),
+            sendRequest: (messages, options, token) => sendChatRequest(m, messages, options || {}, token),
+        };
+    }
+
+    function selectChatModels(selector = {}) {
+        const fits = (m) => (!selector.vendor || selector.vendor === COPILOT_VENDOR) && (!selector.id || selector.id === m.id)
+            && (!selector.family || selector.family === (m.family ?? m.id)) && (!selector.version || selector.version === (m.version ?? m.id));
+        return Promise.resolve((copilot().models || []).filter(fits).map(chatModel));
+    }
+
+    /** Whether VS Code lets the extension use a model: true, false (declined), or undefined (it hasn't asked yet). */
+    const languageModelAccess = {
+        onDidChange: ev.lmAccess.event,
+        canSendRequest: (chat) => (offers(chat?.id) ? copilot().access : undefined),
+    };
+
+    /** VS Code asks the writer, once, whether Euterpe may use the models (its own dialog, with Euterpe's reason). */
+    let consent = null;
+    function askConsent(justification, site) {
+        consent = consent || new Promise((resolve) => {
+            const w = ui.widget({
+                widget: "message", modal: true, vscode: "consent", severity: "info",
+                message: `The extension '${world.packageJSON.displayName}' wants to access the language models provided by ${COPILOT_PROVIDER}.`,
+                detailLabel: justification ? "Justification: " : undefined, detail: justification || undefined,
+                items: [{ title: "Allow" }], site,
+            });
+            w.on("answer", (e) => { w.close(); resolve(!!e && e.index === 0); });
+        }).then((allowed) => { consent = null; setCopilot({ access: allowed }); return allowed; });
+        return consent;
+    }
+
+    /** A failure as VS Code passes it on: a LanguageModelError with its code, else the provider's own error (Copilot's words). */
+    function lmError(e) {
+        const err = typeof e === "string" ? { message: e } : e || {};
+        const cause = err.cause ? new Error(err.cause) : undefined;
+        if (err.code) { return new T.LanguageModelError(err.message || "", err.code, cause); }
+        const plain = new Error(err.message || "Something went wrong.", cause ? { cause } : undefined);
+        if (err.name) { plain.name = err.name; }
+        return plain;
+    }
+
+    async function sendChatRequest(m, messages, options, token) {
+        const site = bench.site();
+        if (!offers(m.id)) { throw T.LanguageModelError.NotFound(`Language model '${m.id}' is unknown.`); }
+        if (copilot().access !== true && !(await askConsent(options.justification, site))) {
+            throw T.LanguageModelError.NoPermissions(`Language model '${m.id}' cannot be used by '${world.extId}'.`);
+        }
+        if (copilot().error) { throw lmError(copilot().error); }
+        if (token?.isCancellationRequested) { throw new T.CancellationError(); }
+        const tools = (options.tools || []).map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
+        const body = { model: m.id, messages: asChat(messages), ...(tools.length ? { tools } : {}) };
+        const r = await new Promise((resolve, reject) => {
+            const sub = token?.onCancellationRequested?.(() => reject(new T.CancellationError()));
+            bench.network.chatTurn(body, JSON.stringify(body), "copilot").then((v) => { sub?.dispose(); resolve(v); }, (err) => { sub?.dispose(); reject(err); });
+        });
+        // VS Code's own refusals come before any answer; the model's failures, as it streams.
+        if (r.failed?.error?.code) { throw lmError(r.failed.error); }
+        const fails = r.failed ? lmError(r.failed.error ?? { message: r.failed.network }) : null;
+        const parts = [];
+        if (r.message?.content) { parts.push(new T.LanguageModelTextPart(r.message.content)); }
+        for (const c of r.message?.tool_calls || []) { parts.push(new T.LanguageModelToolCallPart(c.id, c.function.name, JSON.parse(c.function.arguments || "{}"))); }
+        async function* stream() { for (const p of parts) { yield p; } if (fails) { throw fails; } }
+        async function* text() { for await (const p of stream()) { if (p instanceof T.LanguageModelTextPart) { yield p.value; } } }
+        return { stream: stream(), text: text() };
+    }
+
+    /**
+     * VS Code's messages in Chat Completions' terms, as the network reads a turn: the writer's side's
+     * words and the results of tools, the model's words and calls. VS Code's API has no system role:
+     * the instructions open the conversation, from the writer's side (copilot.ts); here they're the system's.
+     */
+    function asChat(messages) {
+        const out = [];
+        for (const [i, msg] of (messages || []).entries()) {
+            const parts = Array.isArray(msg?.content) ? msg.content : [new T.LanguageModelTextPart(String(msg?.content ?? ""))];
+            if (msg?.role === T.LanguageModelChatMessageRole.Assistant) {
+                const words = parts.filter((p) => p instanceof T.LanguageModelTextPart).map((p) => p.value).join("");
+                const calls = parts.filter((p) => p instanceof T.LanguageModelToolCallPart).map((c) => ({ id: c.callId, type: "function", function: { name: c.name, arguments: JSON.stringify(c.input ?? {}) } }));
+                out.push({ role: "assistant", content: words || null, ...(calls.length ? { tool_calls: calls } : {}) });
+                continue;
+            }
+            parts.forEach((p, k) => {
+                if (p instanceof T.LanguageModelToolResultPart) { out.push({ role: "tool", tool_call_id: p.callId, content: (p.content || []).map((c) => c?.value ?? "").join("") }); }
+                else if (p instanceof T.LanguageModelTextPart) { out.push({ role: i === 0 && k === 0 ? "system" : "user", content: p.value }); }
+                else if (p instanceof T.LanguageModelDataPart) { out.push({ role: "user", content: `[a picture, ${p.mimeType}]` }); }
+            });
+        }
+        return out;
+    }
+
+    /** The world's Copilot changes (a sign-in, a plan, a policy; VS Code's answer to the writer): as VS Code says it. */
+    function setCopilot(patch) {
+        Object.assign(world.copilot, patch);
+        if ("models" in patch) { ev.lmModels.fire(); }
+        if ("access" in patch) { ev.lmAccess.fire(); }
+    }
+
+    /** VS Code's Copilot setup (the bench's stand-in for it): signing in brings Copilot's models. */
+    function copilotSetup() {
+        const site = bench.site();
+        return new Promise((resolve) => {
+            const w = ui.widget({
+                widget: "message", modal: true, vscode: "copilot-setup", icon: "copilot", severity: "info",
+                message: "Sign in to use AI Features", detail: "By continuing, you agree to GitHub's Terms and Privacy Statement.",
+                items: [{ title: "Continue with GitHub" }, { title: "Skip for now", isCloseAffordance: true }], site,
+            });
+            w.on("answer", (e) => {
+                w.close();
+                if (e && e.index === 0) { setCopilot({ models: copilot().setUp || [] }); }
+                resolve();
+            });
+        });
+    }
+
+    api.lm = {
+        selectChatModels,
+        onDidChangeChatModels: ev.lmModels.event,
+        tools: [],
     };
 
     // ---------- the environment ----------
@@ -987,6 +1121,10 @@ function createVscode(bench) {
             ui.post({ type: "trust", trusted: true });
         },
         setFocused(focused) { if (world.focused === focused) { return; } world.focused = focused; ev.windowState.fire({ focused, active: focused }); },
+        /** The extension's context.languageModelAccessInformation. */
+        languageModelAccess,
+        /** GitHub Copilot changes (its models, VS Code's access answer, a failure for every request). */
+        setCopilot,
         runCommand: (id, ...args) => api.commands.executeCommand(id, ...args),
         /** A page of VS Code's own (the extension's page in the Extensions view, the Settings editor…), or a document the bench shows. */
         openPage: (page, label, extra) => openPage(page, label, extra),

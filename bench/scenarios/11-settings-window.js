@@ -209,15 +209,20 @@ module.exports = {
                 await t.wait(800);
                 await t.screen("named", "A model of the writer's own", "One that isn't among the choices: it joins them, chosen.");
                 await t.webview.do("click", '[data-set="provider"][data-value="openai"]');
+                await t.webview.do("top");
                 await t.webview.do("click", '[data-other-url="1"]');
                 await t.webview.do("type", "#api-url", "openrouter.ai/api/v1");
                 await t.wait(400);
                 await t.screen("url", "An address that isn't one", "");
                 await t.set("openaiBaseUrl", "openrouter.ai/api/v1");
                 await t.wait(800);
+                await t.webview.do("scroll", "#mind");
                 await t.webview.do("click", '[data-run="listModels"]');
                 await t.wait(800);
-                await t.screen("url-saved", "An address that isn't one, saved", "Set in settings.json by hand: the window says what's wrong with it, and listing the models can't work.");
+                await t.webview.do("top");
+                await t.screen("url-saved", "An address that isn't one, saved", "Set in settings.json by hand: the window says what's wrong with it.");
+                await t.webview.do("scroll", "#mind");
+                await t.screen("url-list", "Listing its models can't work", "");
             },
         },
         {
@@ -240,19 +245,22 @@ module.exports = {
             summary: "OpenAI and others, on the plan (the default): signed out, signing in, signed in.",
             world: () => ({ provider: "openai", globalState: { ...planState } }),
             async run(t) {
-                await open(t, "mind");
-                await t.webview.do("top");
-                await t.screen("top", "In blue", "Off Claude, the window wears Inky's blue, and the mascot shown is Inky (Clawd stays with Claude).");
+                await open(t);
+                await t.screen("top", "In blue, signed out", "Off Claude, the window wears Inky's blue (Clawd stays with Claude). Right under the mind's switch, the plan's account: not signed in yet.");
                 await t.webview.do("scroll", "#mind");
-                await t.screen("signed-out", "Signed out", "The plan's account field: not signed in yet. No models until then.");
+                await t.screen("signed-out", "No models yet", "Not until the writer signs in.");
+                await t.webview.do("top");
                 await t.webview.do("click", '[data-run="signIn"]');
                 const page = await t.browser.next({ url: /auth\.openai\.com/ });
                 await t.wait(800);
                 await t.screen("signing-in", "Signing in", "While the browser waits for the writer.");
                 page.answer("allow");
                 await t.wait(2500);
+                page.close();
+                await t.webview.do("top");
+                await t.screen("signed-in", "Signed in", "Who's signed in, the way to the plan's usage settings and to sign out.");
                 await t.webview.do("scroll", "#mind");
-                await t.screen("signed-in", "Signed in", "Who's signed in, the way to the plan's usage settings and to sign out, and the plan's models.");
+                await t.screen("models", "The plan's models", "Euterpe's pick among them, current.");
                 await t.webview.do("scroll", "#reading");
                 await t.screen("reading", "Reading along, on the plan", "What each look costs, on a plan.");
             },
@@ -263,7 +271,7 @@ module.exports = {
             summary: "A sign-in that ended, and the plan's models that can't be listed.",
             world: () => ({ provider: "openai", globalState: { ...planState }, secrets: { [LOGIN]: JSON.stringify({ ...ACCOUNT, ended: "Euterpe's ChatGPT sign-in has ended: OpenAI didn't renew it, and asks you to log in again.", freshLogin: true, at: Date.now() - 3600_000 }) } }),
             async run(t) {
-                await open(t, "mind");
+                await open(t);
                 await t.screen("ended", "A sign-in that ended", "Why, in place of \"Not signed in yet\".");
                 t.world.spec.chatgpt = { models: { status: 502, body: { detail: "Bad gateway" } } };
                 await t.secret(LOGIN, signedIn());
@@ -278,16 +286,21 @@ module.exports = {
             summary: "OpenAI's API: no key, then a key; OpenRouter, listing its models; a model server on this computer.",
             world: { provider: "openai", settings: { openaiBaseUrl: "https://api.openai.com/v1" } },
             async run(t) {
-                await open(t, "mind");
-                await t.screen("no-key", "OpenAI's API, no key yet", "The provider's presets, the key's line, and what the key is for.");
+                await open(t);
+                await t.screen("no-key", "OpenAI's API, no key yet", "Right under the mind's switch: the provider's presets, the key's line, and what the key is for.");
                 await t.secret("euterpe.apiKey:https://api.openai.com", "sk-proj-bench");
                 await t.wait(1200);
+                await t.webview.do("top");
+                await t.screen("key", "A key", "Change it, or forget it.");
                 await t.webview.do("scroll", "#mind");
-                await t.screen("key", "A key", "Change it, or forget it; Euterpe's picks among OpenAI's models.");
+                await t.screen("models", "OpenAI's models", "Euterpe's picks among them.");
+                await t.webview.do("top");
                 await t.webview.do("click", '[data-set="openaiBaseUrl"][data-value="https://openrouter.ai/api/v1"]');
                 await t.wait(1000);
+                await t.webview.do("top");
+                await t.screen("openrouter", "OpenRouter, no key yet", "");
                 await t.webview.do("scroll", "#mind");
-                await t.screen("openrouter", "OpenRouter, no key, no model", "Another provider has no default model: the window says so.");
+                await t.screen("openrouter-model", "OpenRouter, no model", "Another provider has no default model: the window says so.");
                 await t.webview.do("click", '[data-run="listModels"]');
                 await t.wait(1200);
                 await t.screen("list-no-key", "Listing needs a key", "");
@@ -297,9 +310,10 @@ module.exports = {
                 await t.wait(1500);
                 await t.webview.do("scroll", "#mind");
                 await t.screen("listed", "Its models, listed", "Type in the field to search them.");
+                await t.webview.do("top");
                 await t.webview.do("click", '[data-set="openaiBaseUrl"][data-value="http://localhost:11434/v1"]');
                 await t.wait(1000);
-                await t.webview.do("scroll", "#mind");
+                await t.webview.do("top");
                 await t.screen("ollama", "A model server on this computer", "No key, and the writing stays here.");
                 await t.webview.do("scroll", "#reading");
                 await t.screen("ollama-reading", "Reading along, on a local server", "");

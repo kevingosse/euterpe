@@ -49,6 +49,7 @@ export const SETTINGS = {
     model: modelValue,
     openaiModel: modelValue,
     openaiBaseUrl: urlValue,
+    copilotModel: modelValue,
     effort: oneOf(EFFORTS as readonly string[]),
     attention: oneOf(Object.keys(ATTENTION)),
     followActiveEditor: bool,
@@ -140,6 +141,8 @@ export interface SettingsState {
     /** What the running session's mind runs on, during one. */
     liveProvider?: Provider;
     api: ApiView;
+    /** On GitHub Copilot: why it offers no models, when it doesn't (no Copilot here, or signed out of it). */
+    copilot?: { problem?: string };
     values: Record<SettingKey, SettingValue>;
     /** Settings this workspace's own settings set: the window changes them there. */
     workspace: SettingKey[];
@@ -154,7 +157,7 @@ export interface SettingsState {
     /** The provider's default body: what a pack that doesn't hold up leaves on stage. */
     defaultMascot: string;
     models: ModelView[];
-    /** What an empty model setting means: Euterpe's default on Claude and on OpenAI's API, the plan's pick on a ChatGPT plan, none elsewhere. */
+    /** What an empty model setting means: Euterpe's default on Claude and on OpenAI's API, its pick on a ChatGPT plan or GitHub Copilot, none elsewhere. */
     modelDefault: string;
     /** The model the mind runs on now, during a session. */
     liveModel?: string;
@@ -171,16 +174,16 @@ export const mascotView = (m: Mascot): MascotView =>
 
 /**
  * The models to choose from: Euterpe's picks (Claude's; OpenAI's on OpenAI's own API), or the
- * ones a ChatGPT plan offers (`listed`), and the current one if it's none of them. Another
- * provider's models are its own business: there, only the one named.
+ * ones a ChatGPT plan or GitHub Copilot offers (`listed`), and the current one if it's none of them.
+ * Another provider's models are its own business: there, only the one named.
  */
 export function modelViews(current: string, provider: Provider = "claude", openaiApi = true, listed?: readonly ModelView[]): ModelView[] {
     const views: ModelView[] = provider === "claude"
         ? modelsFor("claude").map((m) => ({ id: m.id, name: m.name, detail: m.detail }))
         : listed ? [...listed]
-        : openaiApi ? modelsFor("openai").map((m) => ({ id: m.id, name: m.name, detail: m.detail })) : [];
+        : provider === "openai" && openaiApi ? modelsFor("openai").map((m) => ({ id: m.id, name: m.name, detail: m.detail })) : [];
     if (current.trim() && !views.some((v) => sameModel(v.id, current))) {
-        views.push({ id: current.trim(), name: modelName(current, provider), detail: openaiApi ? "A model you named" : "The model you named" });
+        views.push({ id: current.trim(), name: modelName(current, provider), detail: provider === "copilot" ? "GitHub Copilot doesn't offer it here" : openaiApi ? "A model you named" : "The model you named" });
     }
     return views;
 }

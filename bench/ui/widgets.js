@@ -132,13 +132,20 @@ function showNextModal() {
         c.addEventListener("click", () => { if (W.interactive()) { answer(w.id, "answer", { index: null }); } });
         buttons.append(c);
     }
-    const dlg = el("div", { class: "modal", role: "dialog", "data-surface": "modal", data: { widget: w.id, site: src(s), severity: s.severity } },
+    // A dialog of VS Code's own (`vscode`: its consent to the language models, its Copilot setup):
+    // VS Code's words, but for the ones of Euterpe's it quotes (its detail, after `detailLabel`).
+    const own = s.vscode ? { "data-vscode": "1" } : {};
+    const detail = !s.detail ? null
+        : s.vscode && s.detailLabel ? el("div", { class: "detail", "data-role": "detail", "data-vscode": "0" }, el("span", { "data-vscode": "1", text: s.detailLabel }), el("span", { text: s.detail }))
+            : el("div", { class: "detail", "data-role": "detail", text: s.detail });
+    const dlg = el("div", { class: "modal", role: "dialog", "data-surface": s.vscode ? `vscode-dialog:${s.vscode}` : "modal", data: { widget: w.id, site: src(s), severity: s.severity }, ...own },
         el("div", { class: "top" },
-            el("i", { class: `codicon codicon-${ICON[s.severity] || "info"} ${s.severity}` }),
+            el("i", { class: `codicon codicon-${s.icon || ICON[s.severity] || "info"} ${s.severity}` }),
             el("div", { style: { minWidth: 0, flex: 1 } },
-                el("div", { class: "appname", text: "Visual Studio Code", "data-vscode": "1" }),
+                el("div", { class: "appname", text: "Visual Studio Code", "data-vscode": "1", title: s.vscode ? "VS Code's own dialog, not Euterpe's" : null }),
                 el("div", { class: "message", "data-role": "message", text: s.message }),
-                s.detail ? el("div", { class: "detail", "data-role": "detail", text: s.detail }) : null)),
+                detail,
+                s.vscode === "copilot-setup" ? el("div", { class: "detail bench-only", style: { fontStyle: "italic", opacity: ".7" }, text: "The bench's stand-in for VS Code's Copilot setup: Continue with GitHub signs in." }) : null)),
         buttons);
     w.node = el("div", { class: "modal-back" }, dlg);
     layer()?.append(w.node);

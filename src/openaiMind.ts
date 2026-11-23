@@ -1,5 +1,6 @@
 // The mind on an OpenAI-compatible API: the writer's ChatGPT plan, OpenAI's API, or any provider
-// that speaks it (OpenRouter, a local Ollama or LM Studio...), with the writer's own key. Unlike the
+// that speaks it (OpenRouter, a local Ollama or LM Studio...), with the writer's own key; and GitHub
+// Copilot's models, which copilot.ts lets speak Chat Completions. Unlike the
 // Claude mind there's no agent process: the conversation lives here, and so does the loop that runs
 // the mind's tools (agentTools.ts, and the extension's own: propose_edit, the mascot tools) until it
 // answers. Two dialects: OpenAI's Responses API (reasoning carried across turns, web search,
@@ -53,8 +54,22 @@ export interface OpenAIMindOptions extends MindOptions {
     onEvent?: (e: MindEvent) => void;
     /** Mirror requests and answers into the log. */
     debug: boolean;
-    /** Injectable for tests (default: the OpenAI SDK's client). */
+    /** Injectable for tests (default: the OpenAI SDK's client), or another way to the models (GitHub Copilot's). */
     client?: ModelApi;
+    /** What a failure means, where the client knows better than the API's errors (GitHub Copilot's); undefined: the API's reading. */
+    describeFailure?: (err: unknown, model: string) => ApiFailure | undefined;
+    /** How the mind is paid for, in the log ("on your GitHub Copilot plan"): from the key or sign-in by default. */
+    auth?: string;
+}
+
+/** What a failed call means for the session, in words for the writer. */
+export interface ApiFailure {
+    failure: TurnFailure;
+    why: string;
+    /** The conversation is too long for the model: summarized, then the turn again. */
+    overflow?: boolean;
+    /** A usage limit on the writer's ChatGPT plan. */
+    limit?: boolean;
 }
 
 /**
@@ -165,7 +180,7 @@ export class OpenAIMind extends Mind {
     }
 
     protected launch(): void {
-        const auth = this.opts.chatgpt ? "on your ChatGPT plan" : this.opts.apiKey ? "with your API key" : "with no key";
+        const auth = this.opts.auth ?? (this.opts.chatgpt ? "on your ChatGPT plan" : this.opts.apiKey ? "with your API key" : "with no key");
         this.opts.log(`mind ready: model ${this.currentModel} via ${this.host} (${this.opts.api === "responses" ? "Responses API" : "Chat Completions"}), ${auth}, tools ${this.opts.tools.map((t) => t.name).join(", ")}${this.opts.webSearch ? ", web_search" : ""}`);
         this.opts.onEvent?.({ kind: "ready", text: `model ${this.currentModel} via ${this.host}` });
     }
@@ -324,7 +339,7 @@ export class OpenAIMind extends Mind {
     private turnFailed(err: unknown, aborted: boolean, secs: number): void {
         const f = aborted
             ? { failure: "other" as TurnFailure, why: this.inflight?.interrupted ? "Euterpe got stuck on that one for minutes and let it go." : "The turn was cancelled." }
-            : describeApiFailure(err, this.host, this.currentModel, !!this.opts.chatgpt);
+            : this.describe(err);
         this.opts.log(`turn failed: ${aborted ? "cancelled" : errorText(err).slice(0, 400)}`);
         this.opts.onEvent?.({ kind: "turn", ok: false, secs, detail: f.why });
         // (the session offers the way to the plan's usage settings)
@@ -340,6 +355,10 @@ export class OpenAIMind extends Mind {
         const fatal = this.okTurns === 0 && f.failure === "other" && err instanceof APIError && [400, 403, 404, 422].includes(err.status ?? 0);
         if (fatal) { this.die(f.why); return; }
         this.failTurn(f.why, f.failure);
+    }
+
+    private describe(err: unknown): ApiFailure {
+        return this.opts.describeFailure?.(err, this.currentModel) ?? describeApiFailure(err, this.host, this.currentModel, !!this.opts.chatgpt);
     }
 
     /**
@@ -363,7 +382,7 @@ export class OpenAIMind extends Mind {
         } catch (err) {
             if (ctl.signal.aborted) { return; }
             this.opts.log(`couldn't summarize the conversation: ${errorText(err).slice(0, 300)}`);
-            if (describeApiFailure(err, this.host, this.currentModel, !!this.opts.chatgpt).overflow) {
+            if (this.describe(err).overflow) {
                 this.dialect.reset();
                 this.prefix = "[Your conversation so far grew too long for this model, and was let go. Your memory file keeps what you know of the writer; the document comes again in full.]";
                 this.lastInput = 0;
@@ -672,7 +691,7 @@ export function betterEffort(err: { param?: string | null; message: string }, wa
  * signed in rather than with a key; a sign-in that ended there holds the turns until the writer
  * signs in again ("signed-out").
  */
-export function describeApiFailure(err: unknown, host: string, model: string, plan = false): { failure: TurnFailure; why: string; overflow?: boolean; limit?: boolean } {
+export function describeApiFailure(err: unknown, host: string, model: string, plan = false): ApiFailure {
     if (err instanceof SignInNeeded) { return { failure: "signed-out", why: err.message }; }
     const message = errorText(err).replace(/^\d{3}\s+/, "");
     if (!(err instanceof APIError) || err.status === undefined) {

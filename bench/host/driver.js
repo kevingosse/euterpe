@@ -224,7 +224,11 @@ function createDriver(ctx) {
     const browser = {
         next(f = {}) {
             return until(() => { const i = browserQueue.findIndex((p) => !p.claimed && textMatches(f.url, p.url)); if (i < 0) { return null; } const p = browserQueue[i]; p.claimed = true; return p; }, { what: `the browser to open${f.url ? ` ${f.url}` : ""}` })
-                .then((p) => ({ ...p, answer: (a) => inbox.emit("browser-answer", { id: p.id, answer: a }) }));
+                .then((p) => ({
+                    ...p,
+                    answer: (a) => inbox.emit("browser-answer", { id: p.id, answer: a }),
+                    close: () => { post({ type: "browser", op: "close", id: p.id }); inbox.emit("browser-close", { id: p.id }); },
+                }));
         },
     };
 
@@ -290,6 +294,8 @@ function createDriver(ctx) {
         secret: (key, value) => ctx.secret(key, value),
         /** The writer trusts the folder (Workspace Trust's Trust button). */
         trust: () => wb.grantTrust(),
+        /** GitHub Copilot changes, as VS Code tells extensions: `models` it offers, `access` (VS Code's answer), `error` for every request (see world.js). */
+        copilot: (patch) => wb.setCopilot(patch),
         /** The writer types a line in a terminal (the mind's debug console), and presses Enter. */
         async terminalType(text) {
             const id = [...wb.terminals.keys()].pop();

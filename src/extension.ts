@@ -6,10 +6,11 @@ import {
     PlanNotAllowed, Registration, revokeLogin, signIn, SignInCancelled, SignInNeeded,
 } from "./chatgpt";
 import { ClaudeInstall, resolveClaude } from "./claudeCli";
+import { COPILOT_VENDOR, copilotApi, copilotDefault, CopilotModel, copilotModelsOf } from "./copilot";
 import { downloadElectron, electronTarget, findElectron } from "./electronRuntime";
 import { chooseMascotCommand, installMascot, previewMascot } from "./mascotCommands";
 import { chooseModelCommand } from "./modelCommands";
-import { defaultModel, modelName, sameModel } from "./models";
+import { defaultModel, modelName, rememberCopilotModels, sameModel } from "./models";
 import { choosePersonaCommand, installPersona, newPersona } from "./personaCommands";
 import { EditProposals } from "./proposals";
 import { CHATGPT_SECRET, Endpoint, endpointFor, Provider, providerFor, secretName } from "./providers";
@@ -35,6 +36,8 @@ let storage = "";
 let state: vscode.Memento;
 let workspaceState: vscode.Memento;
 let secrets: vscode.SecretStorage;
+/** Whether VS Code lets Euterpe use a language model (GitHub Copilot's). */
+let languageModelAccess: vscode.LanguageModelAccessInformation | undefined;
 /** A ChatGPT sign-in waiting for the writer in their browser. */
 let signingIn: AbortController | null = null;
 const events = new vscode.EventEmitter<SessionEvent>();
@@ -87,6 +90,8 @@ const host: SettingsHost = {
     cancelSignIn: () => signingIn?.abort(),
     signOut: () => signOutOfChatGpt(),
     planModels: () => listPlanModels(),
+    copilotModels: () => listCopilotModels(),
+    setUpCopilot: () => setUpCopilot(),
 };
 
 /** Returned from activate(): lets scripts (and tests) observe sessions. */
@@ -101,6 +106,7 @@ export function activate(context: vscode.ExtensionContext): EuterpeApi {
     state = context.globalState;
     workspaceState = context.workspaceState;
     secrets = context.secrets;
+    languageModelAccess = context.languageModelAccessInformation;
     output = vscode.window.createOutputChannel("Euterpe");
     statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
 
@@ -118,6 +124,7 @@ export function activate(context: vscode.ExtensionContext): EuterpeApi {
         vscode.commands.registerCommand("euterpe.checkSetup", () => checkSetup({
             output, extensionRoot: root, storageDir: storage, bundledClaude: bundledClaude(), downloadElectron: downloadElectronWithProgress, apiKey,
             chatgptLogin: () => loginStore.load(), chatgptEnded: endedSignIn, planModels: listPlanModels,
+            copilotModels: listCopilotModels, copilotAccess,
         })),
         vscode.commands.registerCommand("euterpe.choosePersona", () => choosePersonaCommand(host)),
         vscode.commands.registerCommand("euterpe.newPersona", () => newPersona(host)),
@@ -333,12 +340,13 @@ async function obtainMind(provider: Provider): Promise<MindRuntime | null> {
         const claude = await obtainClaude();
         return claude ? { provider, claudePath: claude.path } : null;
     }
+    if (provider === "copilot") { return obtainCopilotMind(); }
     const cfg = vscode.workspace.getConfiguration("euterpe");
     let endpoint: Endpoint;
     try {
         endpoint = endpointFor(cfg.get<string>("openaiBaseUrl"));
     } catch (err) {
-        void offerSettings((err as Error).message, "mind");
+        void offerSettings((err as Error).message, "provider");
         return null;
     }
     if (endpoint.chatgpt) { return obtainPlanMind(endpoint, (cfg.get<string>("openaiModel") ?? "").trim()); }
@@ -441,7 +449,7 @@ async function signInWithChatGpt(): Promise<ChatGptLogin | undefined> {
             await state.update(CHATGPT_REGISTRATION, err.registration);
             void vscode.window.showWarningMessage(message, "Sign In Again", "Use an API Key").then((pick) => {
                 if (pick === "Sign In Again") { void signInWithChatGpt(); }
-                else if (pick) { SettingsPanel.show(host, "mind"); }
+                else if (pick) { SettingsPanel.show(host, "provider"); }
             });
         } else if (registration && /another chatgpt account|registration|invalid_client|unauthorized_client/i.test(message)) {
             // The saved registration doesn't fit anymore: the next sign-in registers Euterpe anew.
@@ -490,6 +498,68 @@ async function listPlanModels(): Promise<PlanModel[]> {
     return planModels(await new ChatGptAuth(login, loginStore).headers());
 }
 
+/**
+ * The mind on the writer's GitHub Copilot plan: a model Copilot offers in VS Code (the one they chose,
+ * else Euterpe's pick). VS Code asks them, at the first request, whether Euterpe may use it.
+ */
+async function obtainCopilotMind(): Promise<MindRuntime | null> {
+    let models: CopilotModel[];
+    try {
+        models = await listCopilotModels();
+    } catch (err) {
+        void vscode.window.showErrorMessage((err as Error).message);
+        return null;
+    }
+    if (!models.length) {
+        void offerCopilotSetup();
+        return null;
+    }
+    const chosen = (vscode.workspace.getConfiguration("euterpe").get<string>("copilotModel") ?? "").trim();
+    const model = models.find((m) => sameModel(m.id, chosen || copilotDefault(models) || ""));
+    if (!model) {
+        void offerSettings(`GitHub Copilot doesn't offer the model ${chosen} here: choose another in Euterpe's settings.`, "mind");
+        return null;
+    }
+    log(`mind: ${model.id} on GitHub Copilot${chosen ? "" : " (Euterpe's pick)"}, of ${models.map((m) => m.id).join(", ")}`);
+    const api = copilotApi({
+        vs: vscode,
+        model: async (id) => (await vscode.lm.selectChatModels({ vendor: COPILOT_VENDOR, id }))[0],
+    });
+    return { provider: "copilot", model: model.id, context: model.maxInputTokens, api };
+}
+
+/** The models the writer's GitHub Copilot plan offers in VS Code (none without Copilot, or signed out of it). */
+async function listCopilotModels(): Promise<CopilotModel[]> {
+    if (typeof vscode.lm?.selectChatModels !== "function") {
+        throw new Error("This VS Code can't lend Euterpe GitHub Copilot's models: update VS Code.");
+    }
+    const models = copilotModelsOf(await vscode.lm.selectChatModels({ vendor: COPILOT_VENDOR }));
+    rememberCopilotModels(models);
+    return models;
+}
+
+/** Whether VS Code lets Euterpe use a Copilot model: undefined until it has asked the writer. */
+async function copilotAccess(id: string): Promise<boolean | undefined> {
+    const [chat] = await vscode.lm.selectChatModels({ vendor: COPILOT_VENDOR, id });
+    return chat ? languageModelAccess?.canSendRequest(chat) : undefined;
+}
+
+/** No Copilot models: the writer isn't signed in to GitHub Copilot in VS Code, or has no Copilot. */
+async function offerCopilotSetup(): Promise<void> {
+    const message = "GitHub Copilot offers Euterpe no models: sign in to GitHub Copilot in VS Code first.";
+    log(message);
+    if (await vscode.window.showErrorMessage(message, "Set Up Copilot")) { await setUpCopilot(); }
+}
+
+/** VS Code's own way to sign in to GitHub Copilot (its chat, where an older VS Code has no setup command). */
+async function setUpCopilot(): Promise<void> {
+    try {
+        await vscode.commands.executeCommand("workbench.action.chat.triggerSetup");
+    } catch {
+        await vscode.commands.executeCommand("workbench.action.chat.open");
+    }
+}
+
 /** A problem the settings window can fix, with a way there. */
 async function offerSettings(message: string, section: string): Promise<void> {
     log(message);
@@ -531,7 +601,7 @@ async function setApiKeyCommand(): Promise<void> {
     try {
         endpoint = endpointFor(vscode.workspace.getConfiguration("euterpe").get<string>("openaiBaseUrl"));
     } catch (err) {
-        void offerSettings((err as Error).message, "mind");
+        void offerSettings((err as Error).message, "provider");
         return;
     }
     // A plan has a sign-in, not a key.

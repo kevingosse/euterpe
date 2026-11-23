@@ -1,9 +1,11 @@
-// The model command: which model Euterpe's mind thinks with, on Claude or on an OpenAI-compatible API.
+// The model command: which model Euterpe's mind thinks with, on Claude, on an OpenAI-compatible API,
+// or on GitHub Copilot.
 
 import * as vscode from "vscode";
 import { planDefault, PlanModel } from "./chatgpt";
 import { updateSetting } from "./config";
-import { defaultModel, ModelChoice, modelName, modelsFor, sameModel } from "./models";
+import { copilotDefault, CopilotModel } from "./copilot";
+import { defaultModel, ModelChoice, modelName, modelSetting, modelsFor, sameModel } from "./models";
 import { Endpoint, endpointFor, Provider, providerFor } from "./providers";
 import { WritingSession } from "./session";
 
@@ -11,6 +13,10 @@ export interface ModelHost {
     session(): WritingSession | null;
     /** The models the writer's ChatGPT plan offers (throws without a sign-in). */
     planModels(): Promise<PlanModel[]>;
+    /** The models the writer's GitHub Copilot plan offers in VS Code (none without Copilot). */
+    copilotModels(): Promise<CopilotModel[]>;
+    /** VS Code's own way to sign in to GitHub Copilot. */
+    setUpCopilot(): Promise<void>;
 }
 
 type Item = vscode.QuickPickItem & { model?: string; other?: boolean };
@@ -29,11 +35,25 @@ function endpointNow(): Endpoint | null {
 export async function chooseModelCommand(host: ModelHost): Promise<void> {
     const cfg = vscode.workspace.getConfiguration("euterpe");
     const provider = providerNow(host);
-    const claude = provider === "claude";
-    const endpoint = claude ? null : endpointNow();
+    const claude = provider === "claude", copilot = provider === "copilot";
+    const endpoint = provider === "openai" ? endpointNow() : null;
     const openai = !!endpoint?.openai, plan = !!endpoint?.chatgpt;
     let picks: readonly ModelChoice[] = claude || openai ? modelsFor(provider) : [];
-    if (plan) {
+    if (copilot) {
+        try {
+            const offered = await host.copilotModels();
+            const pick = copilotDefault(offered);
+            picks = offered.map((m) => ({ id: m.id, name: m.name, detail: m.id === pick ? "Euterpe's pick" : "" }));
+        } catch (err) {
+            void vscode.window.showErrorMessage((err as Error).message);
+            return;
+        }
+        if (!picks.length) {
+            const pick = await vscode.window.showErrorMessage("GitHub Copilot offers Euterpe no models: sign in to GitHub Copilot in VS Code first.", "Set Up Copilot");
+            if (pick) { await host.setUpCopilot(); }
+            return;
+        }
+    } else if (plan) {
         try {
             picks = await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: "Listing your plan's models" }, () => host.planModels());
         } catch (err) {
@@ -42,18 +62,21 @@ export async function chooseModelCommand(host: ModelHost): Promise<void> {
         }
     }
     const live = host.session();
-    const current = (live?.provider === provider ? live.model : undefined) ?? (cfg.get<string>(claude ? "model" : "openaiModel") ?? "").trim();
-    const shown = current || (plan ? planDefault(picks) ?? "" : defaultModel(provider, openai));
+    const current = (live?.provider === provider ? live.model : undefined) ?? (cfg.get<string>(modelSetting(provider)) ?? "").trim();
+    const shown = current || (copilot ? copilotDefault(picks) ?? "" : plan ? planDefault(picks) ?? "" : defaultModel(provider, openai));
     const items: Item[] = picks.map((m) => ({ label: m.name, detail: m.detail, model: m.id }));
     if (shown && !items.some((i) => sameModel(i.model!, shown))) {
         items.push({ label: shown, model: shown });
     }
     for (const i of items) { if (sameModel(i.model!, shown)) { i.description = "current"; } }
     const who = claude ? "Claude Code" : plan ? "your ChatGPT plan" : openai ? "OpenAI's API" : "your provider";
-    items.push(
-        ...(items.length ? [{ label: "", kind: vscode.QuickPickItemKind.Separator } as Item] : []),
-        { label: "$(edit) Another Model…", detail: `Any model ${who} knows, by name`, other: true },
-    );
+    // (Copilot's list is all it offers)
+    if (!copilot) {
+        items.push(
+            ...(items.length ? [{ label: "", kind: vscode.QuickPickItemKind.Separator } as Item] : []),
+            { label: "$(edit) Another Model…", detail: `Any model ${who} knows, by name`, other: true },
+        );
+    }
 
     const qp = vscode.window.createQuickPick<Item>();
     qp.title = "Euterpe's Model";
@@ -91,7 +114,7 @@ export async function useModel(host: ModelHost, model: string, provider = provid
         void vscode.window.showErrorMessage(`Euterpe can't think with ${modelName(model, provider)}: ${refused}`);
         return false;
     }
-    await updateSetting(provider === "claude" ? "model" : "openaiModel", model);
+    await updateSetting(modelSetting(provider), model);
     if (live) { void vscode.window.showInformationMessage(`Euterpe thinks with ${modelName(model, provider)} from now on.`); }
     return true;
 }

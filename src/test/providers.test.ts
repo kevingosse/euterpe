@@ -2,8 +2,9 @@ import * as assert from "node:assert/strict";
 import { test } from "node:test";
 import { endpointFor, OPENAI_BASE_URL, PRESETS, providerFor, secretName } from "../providers";
 
-test("the provider is Claude unless the setting says openai", () => {
+test("the provider is Claude unless the setting says openai or copilot", () => {
     assert.equal(providerFor("openai"), "openai");
+    assert.equal(providerFor("copilot"), "copilot");
     for (const v of ["claude", "", undefined, "gemini", 3]) { assert.equal(providerFor(v), "claude", String(v)); }
 });
 

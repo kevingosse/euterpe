@@ -37,6 +37,7 @@
     "markdown",
     "claude",
     "claude code",
+    "copilot",
     "desktop pet",
     "mascot"
   ],
@@ -277,17 +278,20 @@
             "order": 1,
             "enum": [
               "claude",
-              "openai"
+              "openai",
+              "copilot"
             ],
             "enumItemLabels": [
               "Claude",
-              "OpenAI and others"
+              "OpenAI and others",
+              "GitHub Copilot"
             ],
             "enumDescriptions": [
               "Claude, through Claude Code, on your Claude login (a subscription or an API key)",
-              "Your ChatGPT plan (sign in with ChatGPT), OpenAI's API, or any OpenAI-compatible one (OpenRouter, a local Ollama or LM Studio…) with your own key"
+              "Your ChatGPT plan (sign in with ChatGPT), OpenAI's API, or any OpenAI-compatible one (OpenRouter, a local Ollama or LM Studio…) with your own key",
+              "Your GitHub Copilot plan: the models Copilot offers you in VS Code, with no key"
             ],
-            "markdownDescription": "What Euterpe's mind runs on: **Claude**, through Claude Code and your Claude login, or **OpenAI and others**: your ChatGPT plan ([Sign In with ChatGPT](command:euterpe.signIn)), OpenAI's API, or any OpenAI-compatible one with your own key (`#euterpe.openaiBaseUrl#`, [Set API Key](command:euterpe.setApiKey)). Clawd, Claude Code's mascot, only comes with Claude. Takes effect at the next session. [Euterpe's settings](command:euterpe.openSettings?%5B%22mind%22%5D) set it all up."
+            "markdownDescription": "What Euterpe's mind runs on: **Claude**, through Claude Code and your Claude login; **OpenAI and others**: your ChatGPT plan ([Sign In with ChatGPT](command:euterpe.signIn)), OpenAI's API, or any OpenAI-compatible one with your own key (`#euterpe.openaiBaseUrl#`, [Set API Key](command:euterpe.setApiKey)); or **GitHub Copilot**: the models your Copilot plan offers in VS Code. Clawd, Claude Code's mascot, only comes with Claude. Takes effect at the next session. [Euterpe's settings](command:euterpe.openSettings?%5B%22mind%22%5D) set it all up."
           },
           "euterpe.model": {
             "type": "string",
@@ -308,10 +312,16 @@
             "order": 4,
             "markdownDescription": "The OpenAI-compatible API Euterpe's mind uses with **OpenAI and others** (`#euterpe.provider#`). Empty: your ChatGPT plan, with no key: [Sign In with ChatGPT](command:euterpe.signIn). Else its base URL, like `https://api.openai.com/v1` (OpenAI's API), `https://openrouter.ai/api/v1` or `http://localhost:11434/v1` (Ollama), whose API key is kept in VS Code's secret storage, for this address only: [Set API Key](command:euterpe.setApiKey). User settings only: a workspace can't send your key, or your writing, elsewhere."
           },
+          "euterpe.copilotModel": {
+            "type": "string",
+            "default": "",
+            "order": 5,
+            "markdownDescription": "The model Euterpe's mind thinks with on **GitHub Copilot** (`#euterpe.provider#`): one Copilot offers you in VS Code, by its id. Empty: Euterpe's pick (Copilot's newest GPT Terra, when it offers one). [Choose a model](command:euterpe.chooseModel): it also switches during a session."
+          },
           "euterpe.effort": {
             "type": "string",
             "default": "low",
-            "order": 5,
+            "order": 6,
             "enum": [
               "low",
               "medium",
@@ -330,7 +340,7 @@
               "",
               "The slowest, most deliberate replies"
             ],
-            "markdownDescription": "How hard Euterpe thinks before each turn (`claude --effort`, or the API's reasoning effort). Lower: snappier chat replies, and cheaper looks. Not every model takes every level: Euterpe moves to the nearest one it does. Takes effect at the next session."
+            "markdownDescription": "How hard Euterpe thinks before each turn (`claude --effort`, or the API's reasoning effort; GitHub Copilot's models think as Copilot sets them). Lower: snappier chat replies, and cheaper looks. Not every model takes every level: Euterpe moves to the nearest one it does. Takes effect at the next session."
           }
         }
       },

@@ -93,3 +93,13 @@ test("the models offered off Claude: OpenAI's picks on its API, the one named el
     assert.deepEqual(ids("", false), []);
     assert.deepEqual(ids("qwen3-coder:30b", false), ["qwen3-coder:30b"]);
 });
+
+test("on GitHub Copilot: the models it offers, and the one named if it's none of them", () => {
+    assert.deepEqual(checkSetting("provider", "copilot"), { key: "provider", value: "copilot" });
+    assert.deepEqual(checkSetting("copilotModel", "claude-sonnet-4.5"), { key: "copilotModel", value: "claude-sonnet-4.5" });
+    assert.equal(checkSetting("copilotModel", "claude sonnet"), null);
+    const offered = [{ id: "gpt-6.1-sol", name: "GPT-6.1 Sol", detail: "" }];
+    assert.deepEqual(modelViews("", "copilot", true, offered).map((m) => m.id), ["gpt-6.1-sol"], "never OpenAI's picks, whatever the API's address");
+    assert.deepEqual(modelViews("gone-model", "copilot", false, offered).map((m) => m.id), ["gpt-6.1-sol", "gone-model"]);
+    assert.deepEqual(modelViews("", "copilot", true).map((m) => m.id), []);
+});

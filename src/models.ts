@@ -37,17 +37,31 @@ export const OPENAI_MODELS: readonly ModelChoice[] = [
 ];
 export const OPENAI_DEFAULT_MODEL = "gpt-6.1-sol";
 
-/** The picks for a provider (OpenAI's are for its own API). */
+/** The picks for a provider (OpenAI's are for its own API). GitHub Copilot's are the ones it offers, listed then. */
 export function modelsFor(provider: Provider): readonly ModelChoice[] {
-    return provider === "claude" ? MODELS : OPENAI_MODELS;
+    return provider === "claude" ? MODELS : provider === "openai" ? OPENAI_MODELS : [];
+}
+
+/** The setting that holds a provider's model. */
+export function modelSetting(provider: Provider): "model" | "openaiModel" | "copilotModel" {
+    return provider === "claude" ? "model" : provider === "openai" ? "openaiModel" : "copilotModel";
 }
 
 /**
  * The model a session starts on when the setting is empty: Euterpe's default on Claude, or on
- * OpenAI's API. Another provider's: none, the writer names one.
+ * OpenAI's API. Another provider's: none, the writer names one. (On GitHub Copilot, Euterpe picks
+ * among the models it offers: copilotDefault.)
  */
 export function defaultModel(provider: Provider, openaiApi: boolean): string {
-    return provider === "claude" ? CLAUDE_DEFAULT_MODEL : openaiApi ? OPENAI_DEFAULT_MODEL : "";
+    return provider === "claude" ? CLAUDE_DEFAULT_MODEL : provider === "openai" && openaiApi ? OPENAI_DEFAULT_MODEL : "";
+}
+
+/** GitHub Copilot's models by id, as it named them when it last listed them. */
+const copilotNames = new Map<string, string>();
+
+/** What GitHub Copilot calls its models (copilot.ts lists them): for the names shown later. */
+export function rememberCopilotModels(models: readonly { id: string; name: string }[]): void {
+    for (const m of models) { copilotNames.set(m.id.toLowerCase(), m.name); }
 }
 
 /** The same model, whatever the case, and with or without the [1m] suffix. */
@@ -58,6 +72,7 @@ export function sameModel(a: string, b: string): boolean {
 
 /** A model as the writer knows it: "Sonnet", Euterpe's default for "" on Claude, else its name for the API. */
 export function modelName(id: string, provider: Provider = "claude"): string {
-    if (!id.trim()) { return provider === "claude" ? modelName(CLAUDE_DEFAULT_MODEL) : "no model yet"; }
+    if (!id.trim()) { return provider === "claude" ? modelName(CLAUDE_DEFAULT_MODEL) : provider === "copilot" ? "Euterpe's pick" : "no model yet"; }
+    if (provider === "copilot") { return copilotNames.get(id.trim().toLowerCase()) ?? id.trim(); }
     return modelsFor(provider).find((m) => sameModel(m.id, id))?.name ?? id.trim();
 }

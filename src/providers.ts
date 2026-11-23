@@ -1,16 +1,17 @@
 // Who Euterpe's mind runs on (euterpe.provider): Claude, through Claude Code and the writer's own
-// Claude login, or an OpenAI-compatible API: the writer's ChatGPT plan (Sign in with ChatGPT,
-// chatgpt.ts), OpenAI's API, or another provider's, with the writer's own key. Claude Code is how
-// a Claude subscription may be used at all; OpenAI lets open-source apps use a ChatGPT plan through
-// its public API, and an API needs no program in between, so that mind runs in the extension
-// (openaiMind.ts). vscode-free, for the tests.
+// Claude login; an OpenAI-compatible API: the writer's ChatGPT plan (Sign in with ChatGPT,
+// chatgpt.ts), OpenAI's API, or another provider's, with the writer's own key; or the models the
+// writer's GitHub Copilot plan offers in VS Code (copilot.ts). Claude Code is how a Claude
+// subscription may be used at all; OpenAI lets open-source apps use a ChatGPT plan through its public
+// API, an API needs no program in between, and VS Code lends Copilot's models to extensions, so
+// those minds run in the extension (openaiMind.ts). vscode-free, for the tests.
 
-export const PROVIDERS = ["claude", "openai"] as const;
+export const PROVIDERS = ["claude", "openai", "copilot"] as const;
 export type Provider = typeof PROVIDERS[number];
 
 /** The setting's provider; anything else is Claude, the default. */
 export function providerFor(setting: unknown): Provider {
-    return setting === "openai" ? "openai" : "claude";
+    return setting === "openai" || setting === "copilot" ? setting : "claude";
 }
 
 export const OPENAI_BASE_URL = "https://api.openai.com/v1";

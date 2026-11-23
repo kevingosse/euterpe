@@ -13,8 +13,8 @@
     const MDX = { openExternal: E.openExternal, copy: E.copy };
 
     document.documentElement.style.setProperty("--px", `${Math.max(2, Math.round(SCALE * 0.75))}px`);
-    // A mind that isn't on Claude wears blue rather than Claude's clay.
-    if (params.get("theme") === "openai") document.documentElement.classList.add("theme-openai");
+    // A mind that isn't on Claude wears its own colour rather than Claude's clay: blue, or Copilot's purple.
+    if (["openai", "copilot"].includes(params.get("theme"))) document.documentElement.classList.add(`theme-${params.get("theme")}`);
 
     // The body Euterpe wears: Clawd, or a mascot pack the writer picked (clawd/pack.js). A pack
     // that doesn't hold up leaves the fallback on stage: Clawd, unless the mind isn't on Claude.

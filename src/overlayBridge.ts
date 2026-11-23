@@ -15,8 +15,8 @@ export interface OverlayOptions {
     mascotFile?: string | null;
     /** The pack to wear when the chosen one doesn't hold up; null: Clawd. */
     fallbackMascotFile?: string | null;
-    /** The colours of the chat and its buttons: Claude's clay, or blue for a mind on another provider. */
-    theme?: "claude" | "openai";
+    /** The colours of the chat and its buttons, the mind's provider's: Claude's clay, OpenAI's blue, Copilot's purple. */
+    theme?: "claude" | "openai" | "copilot";
     log: (msg: string) => void;
 }
 

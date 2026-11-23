@@ -2,7 +2,7 @@
 
 ## Layout
 
-- **`src/`**: the VS Code extension (TypeScript; the repo root is the extension). `claudeMind.ts` runs the mind through Claude Code, `openaiMind.ts` through OpenAI-compatible APIs.
+- **`src/`**: the VS Code extension (TypeScript; the repo root is the extension). `claudeMind.ts` runs the mind through Claude Code, `openaiMind.ts` through OpenAI-compatible APIs, and on GitHub Copilot's models through `copilot.ts`, which speaks VS Code's Language Model API.
 - **`mind/`**: the system prompt and the bundled personas.
 - **`overlay/`**: the Electron app that draws Euterpe's body, its speech bubble and the chat. `renderer/clawd/` is the animation engine.
 - **`settings/`**: the settings window (**Euterpe: Open Settings**), a webview.

@@ -1,7 +1,8 @@
 // The network, as the extension's world sees it: OpenAI's sign-in (Sign in with ChatGPT), OpenAI's
 // API and the ChatGPT plan's catalog, OpenAI-compatible providers, and Electron's download. Nothing
 // leaves the machine: every request is answered here, as the scenario's world says, and the mind's
-// turns go to the host's turn router (the scenario, or the reviewer at the mind's controls).
+// turns go to the host's turn router (the scenario, or the reviewer at the mind's controls). GitHub
+// Copilot's models (through VS Code, vscode.js) answer their turns here too, in Chat Completions.
 "use strict";
 
 const crypto = require("crypto");
@@ -149,16 +150,63 @@ function createNetwork(world, router, log) {
     async function chatCompletions(req, body, bodyText) {
         const fail = net.chat?.error;
         if (fail) { return errorResponse(fail); }
-        const text = (body.messages || []).filter((m) => m.role === "user").map((m) => (typeof m.content === "string" ? m.content : (m.content || []).map((p) => p.text || "").join(""))).pop() || "";
-        const reply = await once(bodyText, () => router.turn({ api: "chat", model: body.model, text, effort: body.reasoning_effort }));
-        if (reply.error) { return errorResponse(reply.error); }
-        if (reply.network) { throw new TypeError("fetch failed", { cause: new Error(reply.network) }); }
-        const out = reply.raw !== undefined ? reply.raw : JSON.stringify({ expression: reply.expression || "neutral", say: reply.say ?? null, notes: reply.notes ?? 0, action: reply.action ?? null });
+        const r = await chatTurn(body, bodyText, "chat");
+        if (r.failed?.error) { return errorResponse(r.failed.error); }
+        if (r.failed?.network) { throw new TypeError("fetch failed", { cause: new Error(r.failed.network) }); }
         return json(200, {
             id: `chatcmpl-${crypto.randomBytes(6).toString("hex")}`, object: "chat.completion", model: body.model,
-            choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content: out } }],
+            choices: [{ index: 0, finish_reason: r.finish, message: r.message }],
             usage: { prompt_tokens: 9800, completion_tokens: 60, prompt_tokens_details: { cached_tokens: 9000 } },
         });
+    }
+
+    // A reply's tool calls (reply.tools: [{ name, args }], as for Claude Code) are the model's first
+    // answer; the rest of the reply answers the request that brings their results back.
+    const pendingCalls = new Map();   // call id -> { name, args, rest }
+    const contentText = (c) => (typeof c === "string" ? c : Array.isArray(c) ? c.map((p) => p?.text || "").join("") : "");
+
+    /**
+     * One turn in Chat Completions, whoever asks: OpenAI-compatible APIs over HTTP (`api` "chat"),
+     * or GitHub Copilot's models through VS Code (`api` "copilot", vscode.js). The router answers it;
+     * what comes back is the model's message ({ message, finish }), or the failure the reply asks
+     * for ({ failed: { error } or { network } }). `key`: the request, for once().
+     */
+    async function chatTurn(body, key, api) {
+        const messages = body.messages || [];
+        // (what the mind is given, for the scenarios that show it)
+        router.lastInstructions = contentText(messages.find((m) => m.role === "system")?.content) || router.lastInstructions;
+        if (Array.isArray(body.tools)) { router.lastTools = body.tools.map((t) => ({ name: t.function?.name, description: t.function?.description, parameters: t.function?.parameters })); }
+        // The results of calls a reply made (and any pictures they came with): what's left of that reply answers.
+        let lastAnswer = messages.length - 1;
+        while (lastAnswer >= 0 && messages[lastAnswer].role !== "assistant") { lastAnswer--; }
+        const results = messages.slice(lastAnswer + 1).filter((m) => m.role === "tool");
+        const made = lastAnswer >= 0 && results.length ? pendingCalls.get(results[0].tool_call_id) : null;
+        if (made) {
+            for (const r of results) {
+                const call = pendingCalls.get(r.tool_call_id);
+                pendingCalls.delete(r.tool_call_id);
+                const content = contentText(r.content);
+                if (call) { router.info({ toolResult: { name: call.name, args: call.args, content: content.replace(/^Error: /, ""), isError: /^Error: /.test(content) } }); }
+            }
+            return answer(made.rest);
+        }
+        const text = messages.filter((m) => m.role === "user").map((m) => contentText(m.content)).pop() || "";
+        const reply = await once(key, () => router.turn({ api, model: body.model, text, effort: body.reasoning_effort }));
+        if (reply.error || reply.network) { return { failed: reply }; }
+        if (reply.tools?.length && body.tool_choice !== "none") {
+            const { tools, ...rest } = reply;
+            const calls = tools.map((t) => {
+                const id = `call_${crypto.randomBytes(6).toString("hex")}`;
+                pendingCalls.set(id, { name: t.name, args: t.args || {}, rest });
+                return { id, type: "function", function: { name: t.name, arguments: JSON.stringify(t.args || {}) } };
+            });
+            return { message: { role: "assistant", content: null, tool_calls: calls }, finish: "tool_calls" };
+        }
+        return answer(reply);
+    }
+    function answer(reply) {
+        const out = reply.raw !== undefined ? reply.raw : JSON.stringify({ expression: reply.expression || "neutral", say: reply.say ?? null, notes: reply.notes ?? 0, action: reply.action ?? null });
+        return { message: { role: "assistant", content: out }, finish: "stop" };
     }
 
     /** An API error: { status, code, type, message, param } (an OpenAI-style body), in a stream when asked. */
@@ -313,7 +361,7 @@ function createNetwork(world, router, log) {
         return { ...realHttps, get, request: realHttps.request };
     }
 
-    return { fetch, realFetch, authorize, createHttps, PLAN_MODELS, idToken };
+    return { fetch, realFetch, authorize, createHttps, chatTurn, PLAN_MODELS, idToken };
 }
 
 module.exports = { createNetwork, PLAN_MODELS, API_MODELS };

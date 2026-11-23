@@ -20,13 +20,20 @@
 
 body.vscode-light { --accent-text: #A84D33; }
 
-/* A mind that isn't on Claude wears ink blue (Inky's), not Claude's clay. */
+/* A mind that isn't on Claude wears its provider's colour, not Claude's clay: ink blue (Inky's)
+   on OpenAI & others, GitHub's purple on Copilot. */
 body.provider-openai {
     --accent: #4E73D2;
     --accent-text: #7C9CEB;
     --accent-strong: #3555B0;          /* 6:1 against cream */
 }
 body.vscode-light.provider-openai { --accent-text: #2E4893; }
+body.provider-copilot {
+    --accent: #8250DF;
+    --accent-text: #A983F2;
+    --accent-strong: #6639BA;          /* 7:1 against cream */
+}
+body.vscode-light.provider-copilot { --accent-text: #6639BA; }
 
 body.vscode-high-contrast, body.vscode-high-contrast-light {
     --accent-text: var(--vscode-contrastActiveBorder, var(--vscode-foreground));
@@ -136,6 +143,14 @@ p { margin: 0; }
 }
 .segmented-big button { padding: 6px 18px; font-weight: 600; }
 .provider-desc { flex: 1 1 280px; }
+/* What the mind takes (the API and its key, a sign-in), right under the choice. */
+.provider-block { scroll-margin-top: 16px; }
+.provider-block.flash { animation: flash 1.6s ease-out; }
+.access {
+    margin-top: 18px;
+    padding: 2px 0 2px 16px;
+    box-shadow: inset 2px 0 0 var(--accent);
+}
 
 /* ---------- the section links ---------- */
 

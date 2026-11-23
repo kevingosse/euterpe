@@ -18,6 +18,7 @@ const chapters = [
     require("./12-check-setup"),
     require("./13-behind-the-curtain"),
     require("./14-contributors"),
+    require("./15-copilot"),
 ];
 
 function byId(id) {

@@ -7,13 +7,14 @@ import { Attention, attentionFor } from "./attention";
 import { MANAGE_USAGE_URL } from "./chatgpt";
 import { ClaudeMind, MCP_SERVER_NAME, mindSettings } from "./claudeMind";
 import { updateSetting } from "./config";
+import { COPILOT_NAME, describeCopilotFailure } from "./copilot";
 import { chooseMascot, CLAWD, defaultMascot, findMascot, Mascot } from "./mascots";
 import { mascotTools } from "./mascotTools";
 import { McpServer, McpTool } from "./mcpServer";
 import { Mind } from "./mind";
 import { MindConsole } from "./mindConsole";
-import { defaultModel, modelName, sameModel } from "./models";
-import { OpenAIMind, PlanAuth } from "./openaiMind";
+import { defaultModel, modelName, modelSetting, sameModel } from "./models";
+import { ModelApi, OpenAIMind, PlanAuth } from "./openaiMind";
 import { OverlayBridge } from "./overlayBridge";
 import { PerceptionWriter } from "./perception";
 import { choosePersona, Persona } from "./personas";
@@ -26,6 +27,8 @@ import { displayName, isWatchable, Sensors } from "./sensors";
 const GOODBYE_TIMEOUT_MS = 25_000;
 /** The longest conversation a mind on an API keeps before summarizing it (see OpenAIMind's compactWindow). */
 const API_COMPACT_WINDOW = 240_000;
+/** On GitHub Copilot, the share of the model's window a conversation fills before it's summarized (the size is an estimate). */
+const COPILOT_WINDOW_SHARE = 0.7;
 const NOTES_REQUEST = "[The writer clicked your notes badge — they'd like the notes you're holding.]";
 
 /** What the mind hears about its proposed edits, in the next perception. */
@@ -134,7 +137,7 @@ export class WritingSession implements vscode.Disposable {
         this.mascot = mascot;
         log(`mascot: ${mascot.name}${mascot.file ? ` (${mascot.file})` : ""}`);
         // The API's own web search is OpenAI's (its API's, or the plan's); elsewhere the mind fetches pages.
-        const webSearch = runtime.provider === "claude" || runtime.endpoint.openai || runtime.endpoint.chatgpt;
+        const webSearch = runtime.provider === "claude" || (runtime.provider === "openai" && (runtime.endpoint.openai || runtime.endpoint.chatgpt));
         const prompt = this.assemblePrompt(home, persona, attention, mascot, provider, webSearch);
         // mkdtemp makes it 0700 on macOS and Linux, where the temp dir can be shared.
         this.tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "euterpe-"));
@@ -224,6 +227,27 @@ export class WritingSession implements vscode.Disposable {
                 debug,
                 onTraffic: this.console ? (dir, line) => this.console?.traffic(dir, line) : undefined,
             });
+        } else if (runtime.provider === "copilot") {
+            const window = runtime.context > 0 ? Math.floor(runtime.context * COPILOT_WINDOW_SHARE) : API_COMPACT_WINDOW;
+            mind = new OpenAIMind({
+                ...perception,
+                baseURL: "",
+                name: COPILOT_NAME,
+                auth: "on your GitHub Copilot plan, through VS Code",
+                apiKey: "",
+                model: runtime.model,
+                effort: "",   // VS Code's API takes none
+                api: "chat",
+                instructions: prompt,
+                tools: [...agentTools({ home, tmpDir: this.tmpDir }), ...ownTools],
+                webSearch: false,
+                openaiExtras: false,
+                compactWindow: Math.min(attention.compactWindow, API_COMPACT_WINDOW, window),
+                client: runtime.api,
+                describeFailure: describeCopilotFailure,
+                debug,
+                onEvent: this.console ? (e) => this.console?.event(e) : undefined,
+            });
         } else {
             const { endpoint } = runtime;
             // OpenAI's own servers are the Responses API's home; Chat Completions is what every provider speaks.
@@ -300,13 +324,15 @@ export class WritingSession implements vscode.Disposable {
         });
         mind.on("model-refused", (failed: string, back: string) => {
             // The writer just picked it (Choose Model): the setting goes back too, or the next session would start on it.
-            const key = provider === "claude" ? "model" : "openaiModel";
+            const key = modelSetting(provider);
             const settings = vscode.workspace.getConfiguration("euterpe");
             if (sameModel(settings.get<string>(key) ?? "", failed)) {
                 void updateSetting(key, back);
             }
-            const who = runtime.provider === "claude" ? "Claude Code" : runtime.endpoint.name;
-            void vscode.window.showWarningMessage(`${who} can't run Euterpe on ${modelName(failed, provider)}: it may not exist, or you may not have access to it. Euterpe is back on ${modelName(back, provider)}.`);
+            const who = runtime.provider === "claude" ? "Claude Code" : runtime.provider === "copilot" ? COPILOT_NAME : runtime.endpoint.name;
+            // (Copilot only offers models that exist, and that the writer has)
+            const maybe = runtime.provider === "copilot" ? "" : ": it may not exist, or you may not have access to it";
+            void vscode.window.showWarningMessage(`${who} can't run Euterpe on ${modelName(failed, provider)}${maybe}. Euterpe is back on ${modelName(back, provider)}.`);
         });
 
         overlay.on("message", (msg) => {
@@ -575,11 +601,13 @@ export interface SessionRuntime {
 
 /**
  * What the mind runs on: Claude Code (claudeCli.ts), or an OpenAI-compatible API with the writer's
- * key, or their ChatGPT plan with their sign-in (`chatgpt`, chatgpt.ts).
+ * key, or their ChatGPT plan with their sign-in (`chatgpt`, chatgpt.ts), or the models their GitHub
+ * Copilot plan offers in VS Code (`api`, copilot.ts; `context`: the model's window, in tokens).
  */
 export type MindRuntime =
     | { provider: "claude"; claudePath: string }
-    | { provider: "openai"; endpoint: Endpoint; apiKey: string; model: string; chatgpt?: PlanAuth };
+    | { provider: "openai"; endpoint: Endpoint; apiKey: string; model: string; chatgpt?: PlanAuth }
+    | { provider: "copilot"; model: string; context: number; api: ModelApi };
 
 /** Time to read Euterpe's last words before the overlay plays its exit. */
 function readingDelay(say: string | null): number {

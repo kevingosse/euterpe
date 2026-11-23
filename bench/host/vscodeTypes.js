@@ -1,6 +1,7 @@
 // The value types of the vscode API, as the extension uses them: Uri (with VS Code's own
 // spelling of file paths), events, positions and ranges, edits, icons, Markdown strings, tab
-// inputs and the enums. Behaviour lives in vscode.js.
+// inputs, the Language Model API's messages, parts and errors, and the enums. Behaviour lives in
+// vscode.js.
 "use strict";
 
 const path = require("path");
@@ -245,9 +246,46 @@ class TabInputWebview { constructor(viewType) { this.viewType = viewType; } }
 class TabInputCustom { constructor(uri, viewType) { this.uri = uri; this.viewType = viewType; } }
 class TabInputTerminal { constructor() { } }
 
+// ---------- the Language Model API (GitHub Copilot's models, lent to extensions) ----------
+
+class LanguageModelTextPart { constructor(value) { this.value = value; } }
+class LanguageModelToolCallPart { constructor(callId, name, input) { this.callId = callId; this.name = name; this.input = input; } }
+class LanguageModelToolResultPart { constructor(callId, content) { this.callId = callId; this.content = content; } }
+class LanguageModelDataPart {
+    constructor(data, mimeType) { this.data = data; this.mimeType = mimeType; }
+    static image(data, mime) { return new LanguageModelDataPart(data, mime); }
+    static json(value, mime = "text/x-json") { return new LanguageModelDataPart(Buffer.from(JSON.stringify(value)), mime); }
+    static text(value, mime = "text/plain") { return new LanguageModelDataPart(Buffer.from(value), mime); }
+}
+class LanguageModelChatMessage {
+    constructor(role, content, name) {
+        this.role = role;
+        this.content = typeof content === "string" ? [new LanguageModelTextPart(content)] : content;
+        this.name = name;
+    }
+    static User(content, name) { return new LanguageModelChatMessage(1, content, name); }
+    static Assistant(content, name) { return new LanguageModelChatMessage(2, content, name); }
+}
+/** As VS Code throws it: `code` is the factory's name ("NoPermissions", "Blocked", "NotFound"). */
+class LanguageModelError extends Error {
+    constructor(message, code, cause) {
+        super(message, cause ? { cause } : undefined);
+        this.name = "LanguageModelError";
+        this.code = code ?? "";
+    }
+    static NoPermissions(message) { return new LanguageModelError(message, "NoPermissions"); }
+    static Blocked(message) { return new LanguageModelError(message, "Blocked"); }
+    static NotFound(message) { return new LanguageModelError(message, "NotFound"); }
+}
+class CancellationError extends Error {
+    constructor() { super("Canceled"); this.name = "Canceled"; }
+}
+
 // ---------- enums ----------
 
 const enums = {
+    LanguageModelChatMessageRole: { User: 1, Assistant: 2 },
+    LanguageModelChatToolMode: { Auto: 1, Required: 2 },
     StatusBarAlignment: { Left: 1, Right: 2 },
     ProgressLocation: { SourceControl: 1, Window: 10, Notification: 15 },
     ViewColumn: { Active: -1, Beside: -2, One: 1, Two: 2, Three: 3, Four: 4, Five: 5, Six: 6, Seven: 7, Eight: 8, Nine: 9 },
@@ -268,5 +306,6 @@ const enums = {
 module.exports = {
     Uri, Disposable, EventEmitter, CancellationTokenSource, Position, Range, Selection, TextEdit, WorkspaceEdit,
     ThemeColor, ThemeIcon, MarkdownString, TabInputText, TabInputTextDiff, TabInputWebview, TabInputCustom, TabInputTerminal,
+    LanguageModelTextPart, LanguageModelToolCallPart, LanguageModelToolResultPart, LanguageModelDataPart, LanguageModelChatMessage, LanguageModelError, CancellationError,
     ...enums,
 };

@@ -11,7 +11,7 @@
     --clay: #D97757;
     --clay-lt: #F2A283;
     --clay-dk: #A84D33;
-    /* The chat's colour: Claude's clay, or ink blue for a mind on another provider (theme-openai). */
+    /* The chat's colour: Claude's clay; ink blue on OpenAI & others (theme-openai); GitHub's purple on Copilot (theme-copilot). */
     --accent: var(--clay);
     --accent-lt: var(--clay-lt);
     --accent-dk: var(--clay-dk);
@@ -28,6 +28,13 @@
     --accent-lt: #8AA8F0;
     --accent-dk: #2E4893;
     --accent-user: #2F3F6B;
+}
+
+.theme-copilot {
+    --accent: #8250DF;          /* GitHub's purple */
+    --accent-lt: #B392F0;
+    --accent-dk: #6639BA;
+    --accent-user: #4A3375;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }

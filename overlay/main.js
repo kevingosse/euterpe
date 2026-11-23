@@ -37,8 +37,8 @@ const scale = Math.max(2, Math.min(6, Math.round(Number(argValue("euterpe-scale"
 // Claude never wears Clawd).
 const initialMascot = readMascot(argValue("euterpe-mascot"));
 const fallbackMascot = readMascot(argValue("euterpe-fallback-mascot"));
-// The chat's colours: Claude's clay, or "openai" (blue) for a mind on another provider.
-const theme = argValue("euterpe-theme") === "openai" ? "openai" : "";
+// The chat's colours: Claude's clay, "openai" (blue) or "copilot" (purple).
+const theme = ["openai", "copilot"].includes(argValue("euterpe-theme")) ? argValue("euterpe-theme") : "";
 const screenshotPath = argValue("screenshot");
 const screenshotDelay = Number(argValue("screenshot-delay")) || 7000;
 const demo = process.argv.includes("--demo") || !!screenshotPath;

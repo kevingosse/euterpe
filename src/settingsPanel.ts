@@ -12,6 +12,7 @@ import * as vscode from "vscode";
 import { ChatGptLogin, EndedLogin, MANAGE_USAGE_URL, planDefault, PlanModel } from "./chatgpt";
 import { resolveClaude } from "./claudeCli";
 import { UnknownSettingError, updateSetting } from "./config";
+import { copilotDefault } from "./copilot";
 import { ELECTRON_VERSION, findElectron } from "./electronRuntime";
 import { chooseMascot, defaultMascot, listMascots } from "./mascots";
 import {
@@ -19,7 +20,7 @@ import {
 } from "./mascotCommands";
 import { buildMindEnv } from "./claudeMind";
 import { ModelHost, useModel } from "./modelCommands";
-import { defaultModel } from "./models";
+import { defaultModel, modelSetting } from "./models";
 import { apiClient } from "./openaiMind";
 import { editPersona, installPersona, newPersona, openPersonasFolder, PersonaHost, personaDirs, usePersona } from "./personaCommands";
 import { choosePersona, listPersonas, loadPersonaFile } from "./personas";
@@ -54,8 +55,8 @@ export interface SettingsHost extends MascotHost, PersonaHost, ModelHost {
 /** How long the window trusts the plan's models it listed. */
 const PLAN_MODELS_TTL_MS = 10 * 60_000;
 
-/** The window's sections, which a link can open it at (euterpe.openSettings "mascot"). */
-const SECTIONS = ["persona", "mascot", "mind", "reading", "setup"];
+/** The window's sections, which a link can open it at (euterpe.openSettings "mascot"); "provider": the mind's provider, and its key or sign-in. */
+const SECTIONS = ["provider", "persona", "mascot", "mind", "reading", "setup"];
 /** The overlay's engine, in the order the overlay loads it. */
 const ENGINE = ["core.js", "glyphs.js", "rig.js", "body.js", "pack.js", "emotes.js", "acting.js", "director.js"];
 
@@ -118,6 +119,8 @@ export class SettingsPanel implements vscode.Disposable {
                 if (e.affectsConfiguration("euterpe.claudePath") || e.affectsConfiguration("euterpe.claudeConfigDir")) { this.detected = undefined; }
                 this.scheduleRefresh();
             }),
+            // GitHub Copilot's models come and go (a sign-in, a plan, a policy).
+            ...(vscode.lm?.onDidChangeChatModels ? [vscode.lm.onDidChangeChatModels(() => this.scheduleRefresh())] : []),
         );
     }
 
@@ -142,7 +145,7 @@ export class SettingsPanel implements vscode.Disposable {
             return false;
         }
         // the tab wears the provider's colours too
-        this.panel.iconPath = vscode.Uri.file(path.join(this.host.extensionRoot, "media", state.provider === "openai" ? "icon-openai.png" : "icon.png"));
+        this.panel.iconPath = vscode.Uri.file(path.join(this.host.extensionRoot, "media", state.provider === "claude" ? "icon.png" : `icon-${state.provider}.png`));
         return this.panel.webview.postMessage({ type: "state", state });
     }
 
@@ -190,8 +193,8 @@ export class SettingsPanel implements vscode.Disposable {
             const { bundled, mine } = mascotDirs(host);
             const m = listMascots(bundled, mine, this.provider()).find((x) => x.id === value);
             if (m) { await wearMascot(host, m); }
-        } else if (key === "model" || key === "openaiModel") {
-            await useModel(host, value as string, key === "model" ? "claude" : "openai");
+        } else if (key === "model" || key === "openaiModel" || key === "copilotModel") {
+            await useModel(host, value as string, key === "model" ? "claude" : key === "openaiModel" ? "openai" : "copilot");
         } else if (key === "openaiBaseUrl") {
             // (the plan is OpenAI's API too, with its own models)
             const which = () => { const e = this.endpoint(); return e?.chatgpt ? "chatgpt" : e?.origin; };
@@ -240,6 +243,7 @@ export class SettingsPanel implements vscode.Disposable {
             case "cancelSignIn": host.cancelSignIn(); break;
             case "signOut": await host.signOut(); this.plan = undefined; break;
             case "listModels": void this.listModels(); break;
+            case "setUpCopilot": await host.setUpCopilot(); break;
             case "startSession": await host.startSession(); break;
         }
     }
@@ -342,12 +346,23 @@ export class SettingsPanel implements vscode.Disposable {
         // What the session shows is for its own provider: the other's mind and body are the next session's business.
         const live = active?.provider === provider ? active : null;
         const liveModel = live?.model;
-        const modelKey = provider === "claude" ? "model" : "openaiModel";
-        // On a ChatGPT plan, its own models (the first is what an empty setting means).
+        const modelKey = modelSetting(provider);
+        // On a ChatGPT plan or GitHub Copilot, the models it offers (Euterpe picks one for an empty setting).
         let listed: ModelView[] | undefined;
+        let copilot: SettingsState["copilot"];
         if (provider === "openai" && api.endpoint?.chatgpt && api.account) {
             const plan = await this.planModels(api);
             listed = plan?.map((m) => ({ id: m.id, name: m.name, detail: m.detail })) ?? [];
+        } else if (provider === "copilot") {
+            try {
+                const models = await host.copilotModels();
+                const pick = copilotDefault(models);
+                listed = models.map((m) => ({ id: m.id, name: m.name, detail: m.id === pick ? "Euterpe's pick" : "" }));
+                copilot = models.length ? {} : { problem: "GitHub Copilot offers Euterpe no models: sign in to GitHub Copilot in VS Code first." };
+            } catch (err) {
+                listed = [];
+                copilot = { problem: (err as Error).message };
+            }
         }
         return {
             trusted: vscode.workspace.isTrusted,
@@ -355,6 +370,7 @@ export class SettingsPanel implements vscode.Disposable {
             provider,
             liveProvider: active?.provider,
             api,
+            ...(copilot ? { copilot } : {}),
             values,
             workspace,
             personas: personas.map(personaView),
@@ -364,7 +380,7 @@ export class SettingsPanel implements vscode.Disposable {
             mascot: live?.wearing.id ?? chooseMascot(String(values.mascot ?? ""), md.bundled, md.mine, provider).mascot.id,
             defaultMascot: defaultMascot(provider),
             models: modelViews(liveModel ?? String(values[modelKey] ?? ""), provider, api.endpoint?.openai ?? false, listed),
-            modelDefault: listed ? planDefault(listed) ?? "" : defaultModel(provider, api.endpoint?.openai ?? false),
+            modelDefault: provider === "copilot" ? copilotDefault(listed ?? []) ?? "" : listed ? planDefault(listed) ?? "" : defaultModel(provider, api.endpoint?.openai ?? false),
             liveModel,
             paths: this.paths(values),
             home: memoryDir(),
@@ -469,7 +485,7 @@ export class SettingsPanel implements vscode.Disposable {
     <title>Euterpe Settings</title>
 </head>
 <body>
-    <main id="app" data-icon="${uri("media", "icon.png")}" data-icon-openai="${uri("media", "icon-openai.png")}" aria-busy="true"></main>
+    <main id="app" data-icon="${uri("media", "icon.png")}" data-icon-openai="${uri("media", "icon-openai.png")}" data-icon-copilot="${uri("media", "icon-copilot.png")}" aria-busy="true"></main>
 ${scripts.map((s) => `    <script nonce="${nonce}" src="${s}"></script>`).join("\n")}
 </body>
 </html>`;

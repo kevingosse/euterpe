@@ -68,6 +68,7 @@ net.on("browser", (m) => {
     if (m.op === "open") { openBrowser(m); return; }
     const page = pages.get(m.id);
     if (!page) { return; }
+    if (m.op === "close") { page.win.remove(); pages.delete(m.id); return; }
     if (m.op === "navigate") { page.url.textContent = m.url; page.url.title = m.url; }
     if (m.op === "page") {
         page.body.innerHTML = "";

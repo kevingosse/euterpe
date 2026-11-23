@@ -21,11 +21,11 @@ Everything is kept in `bench/review.json`: the comments (each with the element's
 
 ## What's real
 
-Nothing on screen is a copy of Euterpe's text: the bench runs the real extension, overlay and settings window, against stand-ins for VS Code (`host/vscode.js`), Electron (`fake/electron.js`), Claude Code (`fake/claude.js`) and the network (`host/network.js`). Each scenario runs in a writer's machine of its own, in a folder (`bench/.worlds/<scenario>`, see `host/world.js`). Nothing leaves the machine.
+Nothing on screen is a copy of Euterpe's text: the bench runs the real extension, overlay and settings window, against stand-ins for VS Code (`host/vscode.js`, GitHub Copilot's models included), Electron (`fake/electron.js`), Claude Code (`fake/claude.js`) and the network (`host/network.js`). Each scenario runs in a writer's machine of its own, in a folder (`bench/.worlds/<scenario>`, see `host/world.js`). Nothing leaves the machine.
 
 ### Where it isn't quite the real thing
 
-- VS Code's own parts (its dialogs' Cancel button, the Settings editor, Workspace Trust, the Extensions view) are the bench's drawings of them, marked as VS Code's: a comment on them says so.
+- VS Code's own parts (its dialogs' Cancel button, the Settings editor, Workspace Trust, the Extensions view, its question before Euterpe uses GitHub Copilot's models, its Copilot setup) are the bench's drawings of them, marked as VS Code's: a comment on them says so.
 - Euterpe's window sits a little above the bottom of the desktop, and VS Code's notifications and pickers stay in front of it, so both can be read. On a real screen, Euterpe floats above everything, and its corner is where VS Code shows its notifications.
 - While a screen is under review, Euterpe's bubble stays up (as when the pointer rests on it), and so does the browser's bubble for a value a field refuses (Chromium's fades after a few seconds).
 - To show what's on screen while Euterpe waits on the network (Choose Model listing a plan's models, Check Setup), the bench holds the answer at that screen.
@@ -51,6 +51,6 @@ Scenarios are in `scenarios/`, a file per chapter (`scenarios/index.js` lists th
 }
 ```
 
-`t.screen()` stops for review. Other waits (`t.modal`, `t.quickPick`, `t.input`, `t.progress`, `t.dialog`, `t.mind.turn`, `t.browser.next`, `t.session.started`…) give handles to act with (`click`, `pick`, `type`, `accept`, `reply`, `answer`…). `scenarios/lib.js` has the common steps (start a session, chat). Things that happen on their own while a screen is reviewed (a download, a sign-in) can be held: see `pauseAt` and `t.release()`; an API request, with `network: { hold: ["/models"] }` in the world and `t.release("network")`.
+`t.screen()` stops for review. Other waits (`t.modal`, `t.quickPick`, `t.input`, `t.progress`, `t.dialog`, `t.mind.turn`, `t.browser.next`, `t.session.started`…) give handles to act with (`click`, `pick`, `type`, `accept`, `reply`, `answer`…). `scenarios/lib.js` has the common steps (start a session, chat). Things that happen on their own while a screen is reviewed (a download, a sign-in) can be held: see `pauseAt` and `t.release()`; an API request, with `network: { hold: ["/models"] }` in the world and `t.release("network")`. GitHub Copilot's models, VS Code's answer to Euterpe and a refusal for every request are the world's `copilot` (see `host/world.js`), and change mid-scenario with `t.copilot({...})`; a turn on Copilot fails as a reply says (`{ error: { code: "Blocked", message } }`).
 
 `node bench/dev/run-all.js [chapter or scenario ids] --shots=<dir>` plays scenarios in a headless Chrome (`dev/chrome.js`), passing every screen and saving a screenshot of each, and reports what broke. (It marks the screens it passes as reviewed: delete `bench/review.json` afterwards, or keep a copy.)

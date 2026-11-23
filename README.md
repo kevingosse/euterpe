@@ -14,9 +14,10 @@ Euterpe needs a mind, one of:
 
 - **[Claude Code](https://code.claude.com)**, with a Claude subscription or an API key (the default);
 - **a ChatGPT Plus or Pro plan**;
-- **an API key** for any OpenAI-compatible provider, or a model server on your computer (Ollama, LM Studio).
+- **an API key** for any OpenAI-compatible provider, or a model server on your computer (Ollama, LM Studio);
+- **a GitHub Copilot plan**, signed in to Copilot in VS Code.
 
-For the last two, switch *Mind* to **OpenAI & others** in **Euterpe: Open Settings**, then sign in or set your key. A local model must support tool calls, with a context of 16K tokens or more.
+For the others, switch *Mind* in **Euterpe: Open Settings**: to **OpenAI & others**, then sign in or set your key; or to **GitHub Copilot**, and allow Euterpe when VS Code asks. A local model must support tool calls, with a context of 16K tokens or more.
 
 Then:
 
@@ -73,7 +74,7 @@ Clawd only comes with a mind on Claude: it's Claude Code's mascot. On other mind
 
 ## What it costs
 
-Euterpe takes a short look whenever you pause, mostly served from the prompt cache: at API prices, about $1–2 per hour of writing with Sonnet, the default. On a subscription or a ChatGPT plan, the looks count toward your usage limits; a *relaxed* or *light* `euterpe.attention` looks less often.
+Euterpe takes a short look whenever you pause, mostly served from the prompt cache: at API prices, about $1–2 per hour of writing with Sonnet, the default. On a subscription, a ChatGPT plan or a Copilot plan, the looks count toward your usage limits; a *relaxed* or *light* `euterpe.attention` looks less often.
 
 ## Settings
 
@@ -81,11 +82,12 @@ Euterpe takes a short look whenever you pause, mostly served from the prompt cac
 
 | Setting | Default | |
 |---|---|---|
-| `euterpe.provider` | `claude` | What Euterpe's mind runs on: `claude` (through Claude Code) or `openai` (your ChatGPT plan, OpenAI's API, or any OpenAI-compatible one with your key). |
+| `euterpe.provider` | `claude` | What Euterpe's mind runs on: `claude` (through Claude Code), `openai` (your ChatGPT plan, OpenAI's API, or any OpenAI-compatible one with your key) or `copilot` (the models your GitHub Copilot plan offers in VS Code). |
 | `euterpe.model` | *(Sonnet)* | The Claude model Euterpe thinks with: `haiku` (the quickest and cheapest), `sonnet`, `opus` (more thoughtful, and pricier), `fable` (the most thoughtful, and by far the most expensive), each Claude Code's latest of its kind, or any model Claude Code knows (**Choose Model**, which also switches it mid-session). |
 | `euterpe.openaiModel` | *(your plan's Sol; GPT-6.1 Sol on OpenAI's API)* | The model on `openai`: one your ChatGPT plan offers; on OpenAI's API `gpt-6.1-sol`, `gpt-6-astra`, `gpt-6-luna`, or any model it knows. Another provider has no default: name one. |
 | `euterpe.openaiBaseUrl` | *(your ChatGPT plan)* | The OpenAI-compatible API, by its base URL: `https://api.openai.com/v1` (OpenAI's API), `https://openrouter.ai/api/v1`, `http://localhost:11434/v1` (Ollama)… Its key is set with **Euterpe: Set API Key**; the plan's sign-in with **Euterpe: Sign In with ChatGPT**. User settings only. |
-| `euterpe.effort` | `low` | Reasoning effort (`low`, `medium`, `high` or `xhigh`), on either mind. Lower = snappier chat replies and cheaper looks. |
+| `euterpe.copilotModel` | *(Copilot's newest GPT Terra)* | The model on `copilot`, by its id: one Copilot offers you (**Choose Model** lists them). |
+| `euterpe.effort` | `low` | Reasoning effort (`low`, `medium`, `high` or `xhigh`), on Claude and OpenAI-compatible APIs. Lower = snappier chat replies and cheaper looks. |
 | `euterpe.attention` | `close` | How closely Euterpe reads along: `close`, `relaxed` or `light` — fewer looks, less of your usage. |
 | `euterpe.persona` | `cheeky` | Who Euterpe is: `cheeky`, `warm`, `editor`, `coach`, `drill-sergeant`, `fan`, or one of yours in `~/.euterpe/personas/` (**Choose Persona**). |
 | `euterpe.mascot` | `clawd` | Euterpe's body: `clawd` (on Claude; Inky otherwise), `boo`, `mochi`, `inky`, `clippy`, or one of yours in `~/.euterpe/mascots/` (**Choose Mascot**). |
