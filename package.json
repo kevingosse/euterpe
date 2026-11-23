@@ -316,7 +316,7 @@
             "type": "string",
             "default": "",
             "order": 5,
-            "markdownDescription": "The model Euterpe's mind thinks with on **GitHub Copilot** (`#euterpe.provider#`): one Copilot offers you in VS Code, by its id. Empty: Euterpe's pick (Copilot's newest GPT Terra, when it offers one). [Choose a model](command:euterpe.chooseModel): it also switches during a session."
+            "markdownDescription": "The model Euterpe's mind thinks with on **GitHub Copilot** (`#euterpe.provider#`): one Copilot offers you in VS Code, by its id. Empty: Euterpe's pick, Copilot's Auto (Copilot chooses the model). [Choose a model](command:euterpe.chooseModel): it also switches during a session."
           },
           "euterpe.effort": {
             "type": "string",

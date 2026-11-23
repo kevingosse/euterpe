@@ -1,7 +1,7 @@
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
 import { APIUserAbortError } from "openai";
-import { copilotApi, CopilotError, copilotDefault, copilotModelsOf, describeCopilotFailure, JUSTIFICATION, LmClasses, toMessages } from "../copilot";
+import { copilotApi, CopilotError, copilotDefault, copilotDetail, copilotModelsOf, describeCopilotFailure, JUSTIFICATION, LmClasses, RESULTS_LINE, toMessages } from "../copilot";
 import { McpTool } from "../mcpServer";
 import { modelName, rememberCopilotModels } from "../models";
 import { OpenAIMind } from "../openaiMind";
@@ -63,7 +63,7 @@ const api = (chat: unknown) => copilotApi({ vs, model: async (id) => ((chat as {
 
 // ---------- the models ----------
 
-test("Copilot's models, once each and by name; Euterpe's pick is the newest Terra, else the newest Sol, else the first", () => {
+test("Copilot's models, once each and by name; Euterpe's pick is Auto, else the newest Terra, else the newest Sol, else the first", () => {
     const listed = copilotModelsOf([
         { id: "gpt-6.1-sol", name: "GPT-6.1 Sol", family: "gpt-6.1-sol", maxInputTokens: 200_000 },
         { id: "gpt-6-terra", name: "GPT-6 Terra", family: "gpt-6-terra", maxInputTokens: 200_000 },
@@ -75,7 +75,11 @@ test("Copilot's models, once each and by name; Euterpe's pick is the newest Terr
     ]);
     assert.deepEqual(listed.map((m) => m.name), ["Auto", "Claude Sonnet 4.5", "Claude Sonnet 10", "GPT-6 Terra", "GPT-6.1 Sol", "GPT-6.1 Terra"]);
     assert.equal(listed[0].maxInputTokens, 0, "a window VS Code doesn't give is none");
-    assert.equal(copilotDefault(listed), "gpt-6.1-terra");
+    assert.equal(copilotDefault(listed), "auto");
+    assert.equal(copilotDetail("auto", "auto"), "Copilot chooses the model. Euterpe's pick");
+    assert.equal(copilotDetail("gpt-6.1-terra", "auto"), "");
+    assert.equal(copilotDetail("gpt-6.1-terra", "gpt-6.1-terra"), "Euterpe's pick");
+    assert.equal(copilotDefault(listed.filter((m) => m.id !== "auto")), "gpt-6.1-terra", "no Auto: the newest Terra");
     assert.equal(copilotDefault([{ id: "claude-sonnet-10" }, { id: "gpt-6-sol" }, { id: "gpt-6.1-sol" }, { id: "gpt-6-luna" }]), "gpt-6.1-sol");
     assert.equal(copilotDefault([{ id: "solar-1" }, { id: "terrain-2" }, { id: "gemini-9-pro" }]), "solar-1", "no Terra, no Sol: the first");
     assert.equal(copilotDefault([]), undefined);
@@ -113,7 +117,22 @@ test("a conversation in VS Code's terms: instructions from the writer's side, re
     assert.deepEqual([...(back[3] as DataPart).data], [1, 2, 3]);
     assert.equal((back[3] as DataPart).mimeType, "image/png");
     assert.equal((back[4] as TextPart).value, "<perception 2/>", "an empty answer leaves the writer's side as one message");
+    assert.equal(back.filter((p) => p instanceof TextPart && p.value === RESULTS_LINE).length, 0, "results with words need no line");
     assert.deepEqual(messages[3].content.map((p: any) => p.value), ['{"say":null}']);
+
+    // Results with no words: a line after them (Copilot's Auto refuses a request whose last message has
+    // no words), on every such message, so earlier requests read the same.
+    const call = (id: string) => ({ role: "assistant", content: null, tool_calls: [{ id, type: "function", function: { name: "read_file", arguments: "{}" } }] });
+    const bare = toMessages(vs, [
+        { role: "user", content: "<perception/>" },
+        call("a"), { role: "tool", tool_call_id: "a", content: "one" },
+        call("b"), { role: "tool", tool_call_id: "b", content: "two" },
+    ]) as unknown as ChatMessage[];
+    for (const i of [2, 4]) {
+        const parts = bare[i].content;
+        assert.ok(parts[0] instanceof ToolResultPart, "the results first");
+        assert.equal((parts[1] as TextPart).value, RESULTS_LINE);
+    }
 
     // A VS Code with no pictures: the picture is a word instead.
     const older = toMessages({ ...vs, LanguageModelDataPart: undefined } as LmClasses,

@@ -12,7 +12,7 @@ import * as vscode from "vscode";
 import { ChatGptLogin, EndedLogin, MANAGE_USAGE_URL, planDefault, PlanModel } from "./chatgpt";
 import { resolveClaude } from "./claudeCli";
 import { UnknownSettingError, updateSetting } from "./config";
-import { copilotDefault } from "./copilot";
+import { copilotDefault, copilotDetail } from "./copilot";
 import { ELECTRON_VERSION, findElectron } from "./electronRuntime";
 import { chooseMascot, defaultMascot, listMascots } from "./mascots";
 import {
@@ -357,7 +357,7 @@ export class SettingsPanel implements vscode.Disposable {
             try {
                 const models = await host.copilotModels();
                 const pick = copilotDefault(models);
-                listed = models.map((m) => ({ id: m.id, name: m.name, detail: m.id === pick ? "Euterpe's pick" : "" }));
+                listed = models.map((m) => ({ id: m.id, name: m.name, detail: copilotDetail(m.id, pick) }));
                 copilot = models.length ? {} : { problem: "GitHub Copilot offers Euterpe no models: sign in to GitHub Copilot in VS Code first." };
             } catch (err) {
                 listed = [];

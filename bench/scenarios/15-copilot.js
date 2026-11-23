@@ -53,7 +53,7 @@ module.exports = {
                 await t.webview.do("top");
                 await t.screen("signed-in", "Signed in", "As soon as VS Code has Copilot's models.");
                 await t.webview.do("scroll", "#mind");
-                await t.screen("models", "Copilot's models", "By Copilot's names; Euterpe's pick is its newest GPT Terra. No Effort: Copilot sets it. Below, what each look costs.");
+                await t.screen("models", "Copilot's models", "By Copilot's names; Euterpe's pick is Auto, where Copilot chooses the model. No Effort: Copilot sets it. Below, what each look costs.");
             },
         },
         {
@@ -140,7 +140,7 @@ module.exports = {
             async run(t) {
                 t.run("euterpe.chooseModel");
                 await t.quickPick({ title: "Euterpe's Model" });
-                await t.screen("chooser", "Copilot's models", "By Copilot's names, Euterpe's pick current. No way to name another.");
+                await t.screen("chooser", "Copilot's models", "By Copilot's names, Euterpe's pick (Auto) current. No way to name another.");
             },
         },
         {

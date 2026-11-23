@@ -14,6 +14,8 @@ import type { ApiFailure, ModelApi } from "./openaiMind";
 /** Copilot's models, to VS Code (LanguageModelChat.vendor). */
 export const COPILOT_VENDOR = "copilot";
 export const COPILOT_NAME = "GitHub Copilot";
+/** The words with results that have none (see toMessages). */
+export const RESULTS_LINE = "[Results above.]";
 /** What VS Code's consent dialog says Euterpe wants the models for. */
 export const JUSTIFICATION = "Euterpe reads along as you write, and answers when you talk to it.";
 
@@ -44,17 +46,27 @@ export function copilotModelsOf(chats: readonly Pick<vscode.LanguageModelChat, "
     return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
 
+/** Copilot's Auto, to VS Code: Copilot chooses the model, and keeps it a while for the extension. */
+export const COPILOT_AUTO = "auto";
+
 /**
- * The model Euterpe thinks with on Copilot when the writer chose none: its newest GPT Terra (cheap on
- * Copilot, and Euterpe looks at every pause), else its newest Sol, else the first it offers.
+ * The model Euterpe thinks with on Copilot when the writer chose none: Copilot's Auto, offered
+ * whenever any model is; else its newest GPT Terra (cheap on Copilot, and Euterpe looks at every
+ * pause), else its newest Sol, else the first it offers.
  */
 export function copilotDefault(models: readonly { id: string; family?: string }[]): string | undefined {
+    if (models.some((m) => m.id === COPILOT_AUTO)) { return COPILOT_AUTO; }
     const newest = (tier: string) => {
         const re = new RegExp(`(^|[-.])${tier}($|[-.])`, "i");
         return models.filter((m) => re.test(m.id) || re.test(m.family ?? ""))
             .sort((a, b) => compareVersions(versionOf(b.id), versionOf(a.id)))[0];
     };
     return (newest("terra") ?? newest("sol") ?? models[0])?.id;
+}
+
+/** What the settings window and Choose Model say of a model Copilot offers (`pick`: Euterpe's). */
+export function copilotDetail(id: string, pick: string | undefined): string {
+    return [id === COPILOT_AUTO ? "Copilot chooses the model" : "", id === pick ? "Euterpe's pick" : ""].filter(Boolean).join(". ");
 }
 
 const versionOf = (id: string) => (id.match(/\d+/g) ?? []).map(Number);
@@ -163,6 +175,14 @@ export function toMessages(vs: LmClasses, messages: readonly any[]): vscode.Lang
     // Results before anything else the writer's side says (pictures, words): some models want them first.
     for (const t of turns) {
         if (t.user) { t.parts.sort((a, b) => Number(b instanceof vs.LanguageModelToolResultPart) - Number(a instanceof vs.LanguageModelToolResultPart)); }
+    }
+    // Results with no words get a line: Copilot's Auto chooses its model by the words of the writer's
+    // side's last message, and refuses a request with none (Copilot 0.75, in VS Code 1.147). Every
+    // such message gets it, not just the last, so the conversation reads the same from one request to
+    // the next (and stays in the prompt cache).
+    for (const t of turns) {
+        const results = t.user && t.parts.some((p) => p instanceof vs.LanguageModelToolResultPart);
+        if (results && !t.parts.some((p) => p instanceof vs.LanguageModelTextPart)) { t.parts.push(new vs.LanguageModelTextPart(RESULTS_LINE)); }
     }
     return turns.map((t) => (t.user ? vs.LanguageModelChatMessage.User(t.parts) : vs.LanguageModelChatMessage.Assistant(t.parts)));
 }

@@ -954,6 +954,12 @@ function createVscode(bench) {
         }
         if (copilot().error) { throw lmError(copilot().error); }
         if (token?.isCancellationRequested) { throw new T.CancellationError(); }
+        // Auto chooses its model by the words of the writer's side's last message, and refuses a request with none (Copilot 0.75).
+        if (m.id === "auto") {
+            const last = [...(messages || [])].reverse().find((x) => x?.role === T.LanguageModelChatMessageRole.User);
+            const words = (Array.isArray(last?.content) ? last.content : []).map((p) => (p instanceof T.LanguageModelTextPart ? p.value : "")).join("").trim();
+            if (!words) { throw new Error("Auto mode needs a prompt or a command to route a request."); }
+        }
         const tools = (options.tools || []).map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
         const body = { model: m.id, messages: asChat(messages), ...(tools.length ? { tools } : {}) };
         const r = await new Promise((resolve, reject) => {

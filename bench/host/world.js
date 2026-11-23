@@ -32,6 +32,8 @@ I was actually pretty confident in my setup. BenchmarkDotNet, a dedicated machin
  * (vscode.lm.selectChatModels): what a world has unless it says otherwise.
  */
 const COPILOT_MODELS = [
+    // Copilot's own way of choosing: VS Code lists it among the models.
+    { id: "auto", name: "Auto", family: "auto", version: "auto", maxInputTokens: 128000 },
     { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", family: "claude-sonnet-4.5", version: "claude-sonnet-4.5", maxInputTokens: 128000 },
     { id: "claude-haiku-4.5", name: "Claude Haiku 4.5", family: "claude-haiku-4.5", version: "claude-haiku-4.5", maxInputTokens: 128000 },
     { id: "gpt-6.1-terra", name: "GPT-6.1 Terra", family: "gpt-6.1-terra", version: "gpt-6.1-terra-2026-09-18", maxInputTokens: 128000 },

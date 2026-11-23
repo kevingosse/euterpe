@@ -4,7 +4,7 @@
 import * as vscode from "vscode";
 import { planDefault, PlanModel } from "./chatgpt";
 import { updateSetting } from "./config";
-import { copilotDefault, CopilotModel } from "./copilot";
+import { copilotDefault, copilotDetail, CopilotModel } from "./copilot";
 import { defaultModel, ModelChoice, modelName, modelSetting, modelsFor, sameModel } from "./models";
 import { Endpoint, endpointFor, Provider, providerFor } from "./providers";
 import { WritingSession } from "./session";
@@ -43,7 +43,7 @@ export async function chooseModelCommand(host: ModelHost): Promise<void> {
         try {
             const offered = await host.copilotModels();
             const pick = copilotDefault(offered);
-            picks = offered.map((m) => ({ id: m.id, name: m.name, detail: m.id === pick ? "Euterpe's pick" : "" }));
+            picks = offered.map((m) => ({ id: m.id, name: m.name, detail: copilotDetail(m.id, pick) }));
         } catch (err) {
             void vscode.window.showErrorMessage((err as Error).message);
             return;
