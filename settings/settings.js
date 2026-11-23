@@ -287,13 +287,13 @@
                 ${onPlan() && state.api.modelsProblem ? h`<p class="small problem">${state.api.modelsProblem}</p>` : ""}
                 ${state.provider === "openai" && !current && !onPlan() ? h`<p class="small problem">Name the model Euterpe should think with: ${state.api.endpoint ? state.api.endpoint.name : "your provider"} has no default.</p>` : ""}
             </div>
-            ${onCopilot() ? "" : h`<div class="field">
+            <div class="field">
                 <div class="field-label">Effort ${ws("effort")} ${later("effort")}</div>
                 <div class="segmented" role="group" aria-label="Effort">
                     ${EFFORTS.map(([v, name]) => h`<button data-set="effort" data-value="${v}" aria-pressed="${String(v === effort)}" data-focus="effort:${v}">${name}</button>`)}
                 </div>
-                <p class="muted small">How hard Euterpe thinks before each turn. ${e[2]}${claude() ? "" : " Not every model takes every level: Euterpe moves to the nearest one it does."}</p>
-            </div>`}`);
+                <p class="muted small">How hard Euterpe thinks before each turn. ${e[2]}${claude() ? "" : onCopilot() ? " A model that doesn't take it thinks at its own default." : " Not every model takes every level: Euterpe moves to the nearest one it does."}</p>
+            </div>`);
     }
 
     /** Where the API is, and its key (kept by VS Code, never shown here). */

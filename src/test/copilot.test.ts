@@ -152,13 +152,15 @@ test("an answer comes back as Chat Completions gives it: words, calls, and what 
     const { options } = m.sent[0];
     assert.equal(options.justification, JUSTIFICATION);
     assert.deepEqual(options.tools, [{ name: "read_file", description: "Read a file.", inputSchema: tools[0].function.parameters }]);
-    assert.equal(Object.keys(options).sort().join(), "justification,tools", "nothing VS Code doesn't take");
+    assert.deepEqual(options.configuration, { reasoningEffort: "low" }, "the effort, as Copilot reads it");
+    assert.equal(Object.keys(options).sort().join(), "configuration,justification,tools", "nothing VS Code doesn't take");
 
-    // An answer now: the tools stay listed, and a call is let go.
+    // An answer now: the tools stay listed, and a call is let go. No effort: Copilot's own.
     m.then([new TextPart("{}"), new ToolCallPart("c2", "read_file", {})]);
     const now = await api(m.chat).chat.completions.create({ model: m.chat.id, messages: [{ role: "user", content: "x" }], tools, tool_choice: "none" });
     assert.equal(now.choices[0].message.tool_calls, undefined);
     assert.equal(m.sent[1].options.tools.length, 1);
+    assert.equal(m.sent[1].options.configuration, undefined);
 });
 
 test("a model Copilot doesn't offer, and a request cancelled midway", async () => {

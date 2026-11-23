@@ -340,7 +340,7 @@
               "",
               "The slowest, most deliberate replies"
             ],
-            "markdownDescription": "How hard Euterpe thinks before each turn (`claude --effort`, or the API's reasoning effort; GitHub Copilot's models think as Copilot sets them). Lower: snappier chat replies, and cheaper looks. Not every model takes every level: Euterpe moves to the nearest one it does. Takes effect at the next session."
+            "markdownDescription": "How hard Euterpe thinks before each turn (`claude --effort`, the API's reasoning effort, or GitHub Copilot's Effort Level). Lower: snappier chat replies, and cheaper looks. Not every model takes every level: on an API, Euterpe moves to the nearest one it does; on GitHub Copilot, a model that doesn't take it thinks at its own default. Takes effect at the next session."
           }
         }
       },

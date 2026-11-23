@@ -49,7 +49,7 @@ function render() {
     for (const t of turns.slice(0, 12)) {
         const what = t.kind === "chat" ? `chat: “${(t.chat || "").slice(0, 80)}”` : t.kind;
         const row = el("div", { class: `turn${t.waiting ? " waiting" : ""}` },
-            el("div", {}, el("span", { class: "k", text: t.waiting ? "⏳ " : "✓ " }), el("span", { class: "k", text: what }), el("span", { class: "muted", text: ` · ${t.api}${t.model ? ` · ${t.model}` : ""}` })));
+            el("div", {}, el("span", { class: "k", text: t.waiting ? "⏳ " : "✓ " }), el("span", { class: "k", text: what }), el("span", { class: "muted", text: ` · ${t.api}${t.model ? ` · ${t.model}` : ""}${t.effort ? ` · ${t.effort}` : ""}` })));
         const det = el("details", {}, el("summary", { class: "small muted", text: "What the mind reads" }), el("pre", { text: t.text || "" }));
         row.append(det);
         if (t.reply) { row.append(el("div", { class: "small muted", html: `answered: ${esc(JSON.stringify(t.reply).slice(0, 200))}` })); }

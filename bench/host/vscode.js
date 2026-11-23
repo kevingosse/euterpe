@@ -961,7 +961,9 @@ function createVscode(bench) {
             if (!words) { throw new Error("Auto mode needs a prompt or a command to route a request."); }
         }
         const tools = (options.tools || []).map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
-        const body = { model: m.id, messages: asChat(messages), ...(tools.length ? { tools } : {}) };
+        // (the effort as Copilot reads it: options.configuration, outside VS Code's published API)
+        const effort = options.configuration?.reasoningEffort;
+        const body = { model: m.id, messages: asChat(messages), ...(tools.length ? { tools } : {}), ...(effort ? { reasoning_effort: effort } : {}) };
         const r = await new Promise((resolve, reject) => {
             const sub = token?.onCancellationRequested?.(() => reject(new T.CancellationError()));
             bench.network.chatTurn(body, JSON.stringify(body), "copilot").then((v) => { sub?.dispose(); resolve(v); }, (err) => { sub?.dispose(); reject(err); });

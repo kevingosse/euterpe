@@ -87,7 +87,7 @@ Euterpe takes a short look whenever you pause, mostly served from the prompt cac
 | `euterpe.openaiModel` | *(your plan's Sol; GPT-6.1 Sol on OpenAI's API)* | The model on `openai`: one your ChatGPT plan offers; on OpenAI's API `gpt-6.1-sol`, `gpt-6-astra`, `gpt-6-luna`, or any model it knows. Another provider has no default: name one. |
 | `euterpe.openaiBaseUrl` | *(your ChatGPT plan)* | The OpenAI-compatible API, by its base URL: `https://api.openai.com/v1` (OpenAI's API), `https://openrouter.ai/api/v1`, `http://localhost:11434/v1` (Ollama)… Its key is set with **Euterpe: Set API Key**; the plan's sign-in with **Euterpe: Sign In with ChatGPT**. User settings only. |
 | `euterpe.copilotModel` | *(Copilot's Auto: Copilot chooses)* | The model on `copilot`, by its id: one Copilot offers you (**Choose Model** lists them). |
-| `euterpe.effort` | `low` | Reasoning effort (`low`, `medium`, `high` or `xhigh`), on Claude and OpenAI-compatible APIs. Lower = snappier chat replies and cheaper looks. |
+| `euterpe.effort` | `low` | Reasoning effort (`low`, `medium`, `high` or `xhigh`). Lower = snappier chat replies and cheaper looks. On GitHub Copilot, a model that doesn't take the level thinks at its own default. |
 | `euterpe.attention` | `close` | How closely Euterpe reads along: `close`, `relaxed` or `light` — fewer looks, less of your usage. |
 | `euterpe.persona` | `cheeky` | Who Euterpe is: `cheeky`, `warm`, `editor`, `coach`, `drill-sergeant`, `fan`, or one of yours in `~/.euterpe/personas/` (**Choose Persona**). |
 | `euterpe.mascot` | `clawd` | Euterpe's body: `clawd` (on Claude; Inky otherwise), `boo`, `mochi`, `inky`, `clippy`, or one of yours in `~/.euterpe/mascots/` (**Choose Mascot**). |

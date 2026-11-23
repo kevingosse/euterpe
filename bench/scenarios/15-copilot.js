@@ -53,7 +53,7 @@ module.exports = {
                 await t.webview.do("top");
                 await t.screen("signed-in", "Signed in", "As soon as VS Code has Copilot's models, with the GitHub account when VS Code has just one.");
                 await t.webview.do("scroll", "#mind");
-                await t.screen("models", "Copilot's models", "By Copilot's names; Euterpe's pick is Auto, where Copilot chooses the model. No Effort: Copilot sets it.");
+                await t.screen("models", "Copilot's models", "By Copilot's names; Euterpe's pick is Auto, where Copilot chooses the model. Effort, as on the other minds, with what happens when a model doesn't take it.");
             },
         },
         {

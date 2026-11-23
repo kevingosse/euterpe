@@ -3,8 +3,13 @@
 // own. VS Code asks the writer whether Euterpe may use them; the requests count toward their plan.
 // The mind is OpenAIMind's, on Chat Completions: copilotApi speaks that to it, and VS Code's API to
 // Copilot. That API has no system role (the instructions open the conversation, from the writer's
-// side), no reasoning effort, no structured answers, and no token counts. VS Code's classes are passed
-// in, so the tests run without VS Code.
+// side), no structured answers, and no token counts. VS Code's classes are passed in, so the tests run
+// without VS Code.
+//
+// The effort isn't in VS Code's published API either: a request's `configuration` carries it (VS Code
+// 1.147 lays it over the one the writer picked in Copilot's model picker, and Copilot reads its
+// `reasoningEffort`). A model that doesn't take the level asked for thinks at its own default: Copilot
+// drops it without a word, and VS Code doesn't tell an extension which levels a model takes.
 
 import { APIUserAbortError } from "openai";
 import type * as vscode from "vscode";
@@ -118,7 +123,13 @@ async function complete(o: CopilotApiOptions, body: any, signal?: AbortSignal): 
     signal?.addEventListener("abort", cancel);
     const read = inputTokens(chat, history);
     try {
-        const res = await chat.sendRequest(toMessages(vs, history), { justification: JUSTIFICATION, ...(tools.length ? { tools } : {}) }, cts.token);
+        const effort = typeof body?.reasoning_effort === "string" ? body.reasoning_effort : "";
+        const options: vscode.LanguageModelChatRequestOptions & { configuration?: { reasoningEffort: string } } = {
+            justification: JUSTIFICATION,
+            ...(tools.length ? { tools } : {}),
+            ...(effort ? { configuration: { reasoningEffort: effort } } : {}),
+        };
+        const res = await chat.sendRequest(toMessages(vs, history), options, cts.token);
         let text = "";
         const calls: vscode.LanguageModelToolCallPart[] = [];
         for await (const part of res.stream) {

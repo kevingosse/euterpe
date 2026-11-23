@@ -246,7 +246,7 @@ export class WritingSession implements vscode.Disposable {
                 auth: "on your GitHub Copilot plan, through VS Code",
                 apiKey: "",
                 model: runtime.model,
-                effort: "",   // VS Code's API takes none
+                effort,
                 api: "chat",
                 instructions: prompt,
                 tools: [...agentTools({ home, tmpDir: this.tmpDir }), ...ownTools],
