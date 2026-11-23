@@ -36,8 +36,8 @@
     ];
     const PROVIDERS = [
         ["claude", "Claude", "Claude, through Claude Code, on your Claude login: a subscription or an API key."],
-        ["openai", "OpenAI & others", "Your ChatGPT plan, OpenAI's API, or any OpenAI-compatible one (OpenRouter, a local Ollama or LM Studio…). Clawd stays with Claude."],
-        ["copilot", "GitHub Copilot", "Your GitHub Copilot plan: the models Copilot offers you in VS Code. Clawd stays with Claude."],
+        ["openai", "OpenAI & others", "Your ChatGPT plan, OpenAI's API, or any OpenAI-compatible one (OpenRouter, a local Ollama or LM Studio…)."],
+        ["copilot", "GitHub Copilot", "Your GitHub Copilot plan: the models Copilot offers you in VS Code."],
     ];
     // One click to a provider (src/providers.ts PRESETS); any other OpenAI-compatible address works too.
     // The ChatGPT plan is the setting's default (""): it's OpenAI's API too, signed in rather than keyed.
@@ -97,8 +97,7 @@
             ${readingSection()}
             ${setupSection()}
             <footer class="foot">
-                <p>These are VS Code settings: they live in your settings.json, and travel with Settings Sync.</p>
-                <p><button class="link" data-run="settingsJson">Open settings.json</button> · <button class="link" data-run="vscodeSettings">VS Code's settings page</button></p>
+                <p><button class="link" data-run="settingsJson">Open settings.json</button></p>
             </footer>`);
         app.removeAttribute("aria-busy");
         placePuppets();
@@ -292,7 +291,7 @@
                 <div class="segmented" role="group" aria-label="Effort">
                     ${EFFORTS.map(([v, name]) => h`<button data-set="effort" data-value="${v}" aria-pressed="${String(v === effort)}" data-focus="effort:${v}">${name}</button>`)}
                 </div>
-                <p class="muted small">How hard Euterpe thinks before each turn. ${e[2]}${claude() ? "" : onCopilot() ? " A model that doesn't take it thinks at its own default." : " Not every model takes every level: Euterpe moves to the nearest one it does."}</p>
+                <p class="muted small">How hard Euterpe thinks before each turn. ${e[2]}${claude() || onCopilot() ? "" : " Not every model takes every level: Euterpe moves to the nearest one it does."}</p>
             </div>`);
     }
 
@@ -361,11 +360,9 @@
                 <button class="link" data-run="manageUsage">Manage usage</button> <button class="link" data-run="signOut">Sign out</button></p>`
             : h`<p class="key-line"><span class="key-dot key-missing" aria-hidden="true"></span>${api.ended || "Not signed in yet."}
                 <button class="btn" data-run="signIn">Continue with ChatGPT…</button></p>`;
-        const usage = "Euterpe's requests count toward your plan's usage limits, with no API key, and you can limit Euterpe's share in ChatGPT's settings. What Euterpe reads, your writing included, goes to OpenAI.";
         return h`<div class="field">
                 <div class="field-label">ChatGPT account</div>
                 ${line}
-                <p class="muted small">${a ? usage : `Your browser opens ChatGPT's sign-in, where you let Euterpe use your plan: ChatGPT Plus or Pro. ${usage}`}</p>
             </div>`;
     }
 
@@ -429,7 +426,6 @@
                 <summary>
                     <p class="eyebrow">Setup</p>
                     <h2 id="setup-title">Where things are</h2>
-                    <p class="lede muted">Paths, for when the defaults don't fit, and tools for when something's off. These stay on this computer: a workspace can't change them.</p>
                 </summary>
                 <div class="setup-body">
                     ${rows}

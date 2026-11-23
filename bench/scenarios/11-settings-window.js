@@ -41,7 +41,7 @@ module.exports = {
                 }
                 await t.webview.do("click", '[data-set="effort"][data-value="low"]');
                 await t.webview.do("scroll", "#reading");
-                await t.screen("reading", "Reading along", "How closely Euterpe reads, with what each level costs, and whether it follows you to other documents.");
+                await t.screen("reading", "Reading along", "How closely Euterpe reads, and whether it follows you to other documents.");
                 await t.webview.do("open-setup");
                 await t.webview.do("scroll", "#setup");
                 await t.wait(1500);
@@ -233,8 +233,6 @@ module.exports = {
                 await t.screen("signed-in", "Signed in", "Who's signed in, the way to the plan's usage settings and to sign out.");
                 await t.webview.do("scroll", "#mind");
                 await t.screen("models", "The plan's models", "Euterpe's pick among them, current.");
-                await t.webview.do("scroll", "#reading");
-                await t.screen("reading", "Reading along, on the plan", "What each look costs, on a plan.");
             },
         },
         {
@@ -287,8 +285,6 @@ module.exports = {
                 await t.wait(1000);
                 await t.webview.do("top");
                 await t.screen("ollama", "A model server on this computer", "No key, and the writing stays here.");
-                await t.webview.do("scroll", "#reading");
-                await t.screen("ollama-reading", "Reading along, on a local server", "");
             },
         },
         {

@@ -246,7 +246,6 @@ export class SettingsPanel implements vscode.Disposable {
             case "showLog": host.output.show(); break;
             case "openMemory": await vscode.commands.executeCommand("euterpe.openMemory"); break;
             case "settingsJson": await vscode.commands.executeCommand("workbench.action.openSettingsJson"); break;
-            case "vscodeSettings": await vscode.commands.executeCommand("workbench.action.openSettings", "@ext:kevingosse.euterpe"); break;
             case "manageTrust": await vscode.commands.executeCommand("workbench.trust.manage"); break;
             case "setApiKey": { const e = this.endpoint(); if (e) { await host.setApiKey(e); } break; }
             case "removeApiKey": { const e = this.endpoint(); if (e) { await host.removeApiKey(e); } break; }
