@@ -100,10 +100,17 @@ function resizeTo(width, height) {
     height = Math.max(DEFAULT_H, height);
     place({ x: b.x + size.width - width, y: b.y + size.height - height, width, height });
 }
-function cornerBounds() {
-    const { workArea } = screen.getPrimaryDisplay();
+// The bottom-right corner of the given screen (the primary one by default).
+function cornerBounds(display = screen.getPrimaryDisplay()) {
+    const { workArea } = display;
     const width = Math.min(size.width, workArea.width), height = Math.min(size.height, workArea.height);
     return { x: workArea.x + workArea.width - width - 8, y: workArea.y + workArea.height - height, width, height };
+}
+// The screen Clawd stands on: the window's bottom-right corner, not the whole (maybe resized) window.
+function clawdDisplay() {
+    const b = win.getBounds();
+    const w = Math.min(b.width, DEFAULT_W), h = Math.min(b.height, DEFAULT_H);
+    return screen.getDisplayMatching({ x: b.x + b.width - w, y: b.y + b.height - h, width: w, height: h });
 }
 function initialBounds() {
     const s = offscreen ? null : loadState();   // offscreen renders are the same everywhere
@@ -420,7 +427,7 @@ ipcMain.on("show-context-menu", () => {
     const resized = size.width !== DEFAULT_W || size.height !== DEFAULT_H;
     popupMenu([
         { label: "Talk to Euterpe", click: () => send("talk") },
-        { label: "Back to the corner", click: () => { if (!alive()) return; place(cornerBounds()); saveState(); sendGaze(); } },
+        { label: "Back to the corner", click: () => { if (!alive()) return; place(cornerBounds(clawdDisplay())); saveState(); sendGaze(); } },
         ...(resized ? [{ label: "Default chat size", click: () => { if (!alive()) return; resizeTo(DEFAULT_W, DEFAULT_H); saveState(); } }] : []),
         { type: "separator" },
         { label: "End writing session", click: () => send("close") },
