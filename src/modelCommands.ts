@@ -4,7 +4,7 @@
 import * as vscode from "vscode";
 import { planDefault, PlanModel } from "./chatgpt";
 import { updateSetting } from "./config";
-import { copilotDefault, copilotDetail, CopilotModel } from "./copilot";
+import { COPILOT_SIGNED_OUT, copilotDefault, copilotDetail, CopilotModel } from "./copilot";
 import { defaultModel, ModelChoice, modelName, modelSetting, modelsFor, sameModel } from "./models";
 import { Endpoint, endpointFor, Provider, providerFor } from "./providers";
 import { WritingSession } from "./session";
@@ -49,7 +49,7 @@ export async function chooseModelCommand(host: ModelHost): Promise<void> {
             return;
         }
         if (!picks.length) {
-            const pick = await vscode.window.showErrorMessage("GitHub Copilot offers Euterpe no models: sign in to GitHub Copilot in VS Code first.", "Set Up Copilot");
+            const pick = await vscode.window.showErrorMessage(COPILOT_SIGNED_OUT, "Set Up Copilot");
             if (pick) { await host.setUpCopilot(); }
             return;
         }

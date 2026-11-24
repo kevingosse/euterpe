@@ -1,24 +1,13 @@
 // Chapter 3: what can stand between the writer and a session.
 "use strict";
 
-const { HELLO, startSession } = require("./lib");
+const { HELLO, startSession, settingsInstead } = require("./lib");
 
 module.exports = {
     id: "start-problems",
     title: "3. When a session can't start",
     intro: "Everything that can stop a session from starting, or end it right away, and what Euterpe says each time.",
     scenarios: [
-        {
-            id: "no-document",
-            title: "No document open",
-            summary: "The writer starts a session with no editor open.",
-            world: { open: [] },
-            async run(t) {
-                t.run("euterpe.startSession");
-                await t.notification({ text: /Open the document/ });
-                await t.screen("warning", "Open a document first", "Euterpe follows a document: with none open (or the active editor isn't a text file), it says so.");
-            },
-        },
         {
             id: "remote-window",
             title: "A remote window",
@@ -74,9 +63,7 @@ module.exports = {
             world: { electron: "missing", electronDownload: { pauseAt: 0.3 } },
             async run(t) {
                 t.run("euterpe.startSession");
-                const dl = await t.modal({ text: /Electron/ });
-                dl.click("Download");
-                await t.progress({ title: /Downloading/ });
+                await t.progress({ title: /Getting Euterpe's avatar ready/ });
                 t.run("euterpe.startSession");
                 await t.notification({ text: /on the way/ });
                 await t.screen("on-the-way", "Euterpe is on the way", "A second start while the first is under way.");
@@ -94,13 +81,14 @@ module.exports = {
         {
             id: "claude-missing",
             title: "Claude Code isn't installed",
-            summary: "Claude Code is nowhere Euterpe looks: not on PATH, not where its installers put it, not inside the Claude Code extension.",
-            world: { claude: null },
+            summary: "The writer chose Claude, but Claude Code is nowhere Euterpe looks: not on PATH, not where its installers put it, not inside the Claude Code extension.",
+            world: { claude: null, provider: "claude" },
             async run(t) {
                 t.run("euterpe.startSession");
-                const n = await t.notification({ text: /isn't installed/ });
-                await t.screen("error", "Claude Code isn't installed", "With a way to its installation page.");
-                n.click("Install Claude Code");
+                await t.webview.do("wait", '[data-run="installClaude"]');
+                await t.wait(600);
+                await t.screen("minds", "Claude Code isn't installed", "Euterpe's settings open at the choice of mind, as on a first run: Claude says what's missing, the other minds are one click away.");
+                await t.webview.do("click", '[data-run="installClaude"]');
                 await t.browser.next();
                 await t.screen("install-page", "Install Claude Code", "The button opens Claude Code's setup page in the browser.");
             },
@@ -111,9 +99,8 @@ module.exports = {
             summary: "Claude Code is there, but older than the version Euterpe needs.",
             world: { claude: { version: "2.1.204" } },
             async run(t) {
-                t.run("euterpe.startSession");
-                await t.notification({ text: /too old/ });
-                await t.screen("error", "Claude Code is too old", "Euterpe needs a Claude Code that takes --permission-prompts.");
+                await settingsInstead(t);
+                await t.screen("settings", "Claude Code is too old", "Euterpe needs a Claude Code that takes --permission-prompts: its settings open at the choice of mind, which says what to do.");
             },
         },
         {
@@ -122,9 +109,8 @@ module.exports = {
             summary: "The writer set euterpe.claudePath to a program that isn't there.",
             world: { settings: { claudePath: "{home}/tools/claude/claude.exe" } },
             async run(t) {
-                t.run("euterpe.startSession");
-                await t.notification({ text: /claudePath/ });
-                await t.screen("error", "euterpe.claudePath isn't a working Claude Code", "An explicit path isn't second-guessed: Euterpe doesn't look elsewhere.");
+                await settingsInstead(t);
+                await t.screen("settings", "euterpe.claudePath isn't a working Claude Code", "An explicit path isn't second-guessed: Euterpe doesn't look elsewhere. Its settings open at the choice of mind, with a way to choose the program.");
             },
         },
         {
@@ -133,12 +119,8 @@ module.exports = {
             summary: "The writer set euterpe.claudeConfigDir to a folder that doesn't exist (a typo, a folder not synced yet).",
             world: { settings: { claudeConfigDir: "~/.claude-work" } },
             async run(t) {
-                t.run("euterpe.startSession");
-                const n = await t.notification({ text: /failed to start/ });
-                await t.screen("error", "Euterpe failed to start", "The session refuses a config folder that isn't there (Claude Code would quietly start a signed-out one). The log opens beside it.");
-                n.click("Check Setup");
-                await t.notification({ text: /setup has/ });
-                await t.screen("check", "Check Setup, from the error", "The error's button runs Check Setup: the verdict, and the report in the log.");
+                await settingsInstead(t);
+                await t.screen("settings", "A config folder that isn't there", "A session would refuse it (Claude Code would quietly start a signed-out one): Euterpe's settings open at the choice of mind, with a way to choose the folder.");
             },
         },
         {
@@ -169,11 +151,10 @@ module.exports = {
             summary: "Every way Electron's download can go wrong: the server says no, the file is corrupt, it's cut short, it stalls, the writer cancels it.",
             world: { electron: "missing", electronDownload: { status: 404 } },
             async run(t) {
+                // (each click on Euterpe tries the download again)
                 const attempt = async (spec, key, title, notes, expect) => {
                     t.world.spec.electronDownload = spec;
                     t.run("euterpe.startSession");
-                    const dl = await t.modal({ text: /Electron/ });
-                    dl.click("Download");
                     await t.notification({ text: expect, timeout: 30_000 });
                     await t.screen(key, title, notes);
                 };
@@ -184,9 +165,7 @@ module.exports = {
                 await attempt({ status: 200, redirectLoop: true }, "redirects", "Too many redirects", "", /Too many redirects/);
                 t.world.spec.electronDownload = { status: 200, slow: true };
                 t.run("euterpe.startSession");
-                const dl = await t.modal({ text: /Electron/ });
-                dl.click("Download");
-                const p = await t.progress({ title: /Downloading/ });
+                const p = await t.progress({ title: /Getting Euterpe's avatar ready/ });
                 await t.wait(1500);
                 p.cancel();
                 await p.done;

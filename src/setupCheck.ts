@@ -9,7 +9,8 @@ import * as vscode from "vscode";
 import { ChatGptLogin, EndedLogin, planDefault, PlanModel, SignInNeeded } from "./chatgpt";
 import { resolveClaude } from "./claudeCli";
 import { buildMindEnv } from "./claudeMind";
-import { copilotDefault, CopilotModel } from "./copilot";
+import { COPILOT_SIGNED_OUT, copilotDefault, CopilotModel } from "./copilot";
+import type { RuntimeStatus } from "./avatarRuntime";
 import { ELECTRON_VERSION, findElectron } from "./electronRuntime";
 import { defaultModel, modelName, sameModel } from "./models";
 import { apiClient } from "./openaiMind";
@@ -22,8 +23,10 @@ export interface SetupContext {
     extensionRoot: string;
     storageDir: string;
     bundledClaude: string | null;
-    /** Download the avatar runtime (the writer asked for it from here). */
+    /** Download the avatar runtime (the writer asked for it from here), or wait for the download under way. */
     downloadElectron(): Thenable<string | null>;
+    /** The avatar runtime: there, downloading, or why not (avatarRuntime.ts). */
+    runtime(): RuntimeStatus;
     /** The writer's key for an API, if Euterpe has one. */
     apiKey(e: Endpoint): Promise<string | undefined>;
     /** The ChatGPT sign-in, if there's one (or the one that ended), and the models its plan offers. */
@@ -62,11 +65,16 @@ export async function checkSetup(ctx: SetupContext): Promise<void> {
 
         try {
             const electron = findElectron({ override: cfg.get<string>("electronPath") || "", extensionRoot: ctx.extensionRoot, storageDir: ctx.storageDir });
+            const run = ctx.runtime();
             if (electron) {
                 add(true, `Avatar runtime: ${electron}`);
+            } else if (run.kind === "problem") {
+                add(false, run.message);
             } else {
                 missingElectron = true;
-                add(false, `Avatar runtime not downloaded yet (Electron ${ELECTRON_VERSION}, about 150 MB, once). The first session offers to download it.`);
+                add(false, run.kind === "downloading" || run.kind === "unpacking"
+                    ? `Avatar runtime downloading (Electron ${ELECTRON_VERSION}, once)${run.kind === "downloading" && run.total ? `: ${Math.round(run.received / 1_048_576)} of ${Math.round(run.total / 1_048_576)} MB` : ""}.`
+                    : `Avatar runtime not downloaded yet (Electron ${ELECTRON_VERSION}, about 150 MB, once)${run.kind === "failed" ? `: the last download failed (${run.message})` : ""}. Clicking Euterpe downloads it, and so does opening its settings.`);
             }
         } catch (err) {
             add(false, (err as Error).message);
@@ -93,7 +101,7 @@ export async function checkSetup(ctx: SetupContext): Promise<void> {
 
     const actions = ["Show Details", ...(missingElectron && problems.length === 1 ? ["Download Now"] : [])];
     const verdict = problems.length === 0 ? "Euterpe is all set to write with you."
-        : missingElectron && problems.length === 1 ? "Euterpe is all set, except for its avatar runtime, which the first session downloads."
+        : missingElectron && problems.length === 1 ? "Euterpe is all set, except for its avatar runtime, which downloads when you click Euterpe."
         : `Euterpe's setup has ${problems.length === 1 ? "a problem" : `${problems.length} problems`}: ${problems[0].text}`;
     const show = problems.length === 0 || (missingElectron && problems.length === 1)
         ? vscode.window.showInformationMessage(verdict, ...actions)
@@ -221,7 +229,7 @@ async function checkCopilot(cfg: vscode.WorkspaceConfiguration, ctx: SetupContex
         return;
     }
     if (!models.length) {
-        add(false, "GitHub Copilot offers Euterpe no models: sign in to GitHub Copilot in VS Code first.");
+        add(false, COPILOT_SIGNED_OUT);
         return;
     }
     add(true, `Mind: GitHub Copilot (${models.length} ${models.length === 1 ? "model" : "models"})`);

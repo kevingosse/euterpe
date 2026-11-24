@@ -111,7 +111,8 @@ export class WritingSession implements vscode.Disposable {
     private signedOutWhy = "";
 
     constructor(
-        private readonly document: vscode.TextDocument,
+        /** The document the session starts on; none: the first one the writer opens. */
+        private readonly document: vscode.TextDocument | undefined,
         private readonly extensionRoot: string,
         private readonly runtime: SessionRuntime,
         private readonly hooks: SessionHooks,
@@ -152,10 +153,11 @@ export class WritingSession implements vscode.Disposable {
         // mkdtemp makes it 0700 on macOS and Linux, where the temp dir can be shared.
         this.tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "euterpe-"));
 
+        const doc = this.document;
         const workspaceDir =
-            vscode.workspace.getWorkspaceFolder(this.document.uri)?.uri.fsPath ??
+            (doc && vscode.workspace.getWorkspaceFolder(doc.uri)?.uri.fsPath) ??
             vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ??
-            (this.document.isUntitled ? home : path.dirname(this.document.fileName));
+            (!doc || doc.isUntitled ? home : path.dirname(doc.fileName));
 
         const overlayDir = process.env.EUTERPE_OVERLAY_DIR || this.locate("overlay");
         const overlay = new OverlayBridge({
@@ -381,7 +383,7 @@ export class WritingSession implements vscode.Disposable {
         if (this.ending || this.finished) { return; } // ended while the overlay was starting
         mind.start();
         sensors.start();
-        log(`session started on ${this.document.fileName} (workspace ${workspaceDir})`);
+        log(`session started on ${sensors.watched?.fileName ?? "no document yet"} (workspace ${workspaceDir})`);
         this.hooks.onEvent?.({ kind: "started" });
     }
 
@@ -444,7 +446,10 @@ export class WritingSession implements vscode.Disposable {
      */
     private resolveFile(file: string | undefined, workspaceDir: string): vscode.Uri {
         const watched = this.sensors?.watched ?? this.document;
-        if (!file) { return watched.uri; }
+        if (!file) {
+            if (!watched) { throw new Error("The writer has no document open: name the file to change (absolute, or relative to the workspace)."); }
+            return watched.uri;
+        }
         const norm = (s: string) => {
             const p = s.replace(/\\/g, "/");
             return process.platform === "win32" ? p.toLowerCase() : p;

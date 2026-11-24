@@ -54,6 +54,12 @@ export interface DocSnapshot {
     selection: { start: Position; end: Position } | null;
 }
 
+/** No document to read: the writer invited Euterpe in before opening one. The workspace is still there. */
+export interface NoDocument {
+    key: null;
+    workspace: string;
+}
+
 /** Raw facts about the writer's activity, measured by the sensors. */
 export interface SensorState {
     now: Date;
@@ -135,7 +141,12 @@ export class PerceptionWriter {
         return this.baselines.has(key);
     }
 
-    render(reason: PerceptionReason, doc: DocSnapshot, state: SensorState): RenderedPerception {
+    render(reason: PerceptionReason, doc: DocSnapshot | NoDocument, state: SensorState): RenderedPerception {
+        if (doc.key === null) {
+            // Nothing to compare, and no baseline to move: the first document the writer opens is seen in full.
+            const text = `<euterpe:perception reason="${reason}">\n${renderHeaderWithout(reason, doc, state)}\ndocument: none — the writer hasn't opened one yet.\n</euterpe:perception>`;
+            return { text, full: false, unchanged: false, commit: () => { /* nothing to keep */ } };
+        }
         const base = this.baselines.get(doc.key);
         const header = renderHeader(reason, doc, state);
         const selection = renderSelection(doc, this.opts.selectionCap);
@@ -191,7 +202,7 @@ function renderHeader(reason: PerceptionReason, doc: DocSnapshot, s: SensorState
     const lines: string[] = [];
     lines.push(`time: ${formatClock(s.now)}`);
     lines.push(`file: ${doc.name} (${doc.languageId}${doc.dirty ? ", unsaved changes" : ""}) — workspace: ${doc.workspace}`);
-    lines.push(`VS Code: ${s.focused ? "focused" : s.unfocusedMs === null ? "not focused" : `not focused for ${formatDuration(s.unfocusedMs)}`}`);
+    lines.push(focusLine(s));
     const edit = s.sinceLastEditMs === null ? "no edits yet this session" : `${formatDuration(s.sinceLastEditMs)} ago`;
     const save = s.sinceLastSaveMs === null ? "not saved this session" : `${formatDuration(s.sinceLastSaveMs)} ago`;
     lines.push(`last edit: ${edit} · last save: ${save}`);
@@ -200,13 +211,31 @@ function renderHeader(reason: PerceptionReason, doc: DocSnapshot, s: SensorState
         ? `lines ${doc.selection.start.line + 1}–${doc.selection.end.line + 1}`
         : "none";
     lines.push(`cursor: line ${doc.cursor.line + 1} of ${doc.lines.length} · selection: ${sel}`);
-    for (const e of s.events ?? []) {
-        lines.push(`since your last look: ${e}`);
-    }
+    lines.push(...headerEnd(reason, s));
+    return lines.join("\n");
+}
+
+/** The header with no document open: no file, and none of the typing, saving or cursor that come with one. */
+function renderHeaderWithout(reason: PerceptionReason, doc: NoDocument, s: SensorState): string {
+    return [
+        `time: ${formatClock(s.now)}`,
+        `file: none open — workspace: ${doc.workspace}`,
+        focusLine(s),
+        ...headerEnd(reason, s),
+    ].join("\n");
+}
+
+function focusLine(s: SensorState): string {
+    return `VS Code: ${s.focused ? "focused" : s.unfocusedMs === null ? "not focused" : `not focused for ${formatDuration(s.unfocusedMs)}`}`;
+}
+
+/** What happened since the last look, and the session's end. */
+function headerEnd(reason: PerceptionReason, s: SensorState): string[] {
+    const lines = (s.events ?? []).map((e) => `since your last look: ${e}`);
     if (reason === "session_end") {
         lines.push("the writer is ending the session.");
     }
-    return lines.join("\n");
+    return lines;
 }
 
 function renderFull(doc: DocSnapshot, cap: number): string {

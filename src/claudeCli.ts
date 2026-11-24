@@ -13,6 +13,12 @@ import * as path from "path";
 /** --permission-prompts (see mind.ts) arrived in 2.1.259; older builds reject it. */
 export const MIN_CLAUDE_VERSION = "2.1.259";
 
+/** Where Claude Code's installation is explained. */
+export const CLAUDE_SETUP_URL = "https://code.claude.com/docs/en/setup";
+
+/** Claude Code is nowhere Euterpe looks (and no euterpe.claudePath points elsewhere). */
+export class ClaudeNotFound extends Error { }
+
 export interface ClaudeCandidate {
     path: string;
     /** Where it was found, for the log and Check Setup. */
@@ -165,5 +171,5 @@ export async function resolveClaude(
     if (explicit) {
         throw new Error(`euterpe.claudePath is set to ${setting.trim()}, which isn't a working Claude Code.`);
     }
-    throw new Error("Euterpe's mind runs on Claude Code, which isn't installed (or can't be found). Install it from https://code.claude.com, log in, then try again — or set euterpe.claudePath.");
+    throw new ClaudeNotFound("Euterpe's mind runs on Claude Code, which isn't installed (or can't be found). Install it from https://code.claude.com, log in, then try again — or set euterpe.claudePath.");
 }

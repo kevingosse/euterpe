@@ -145,7 +145,32 @@ module.exports = {
                 await t.webview.do("open-setup");
                 await t.webview.do("scroll", "#setup");
                 await t.wait(1500);
-                await t.screen("hints", "What's in use, and what isn't there yet", "Euterpe's home made at the first session, Electron not downloaded yet, and why no Claude Code was found.");
+                await t.screen("hints", "What's in use, and what isn't there yet", "Euterpe's home made at the first session, and why no Claude Code was found. (Electron downloads meanwhile: see the next scenario.)");
+            },
+        },
+        {
+            id: "settings-runtime",
+            title: "The avatar's runtime, downloading",
+            summary: "Electron isn't downloaded yet: opening the window starts its download, shown in a banner at the top. The writer cancels it, it fails, and euterpe.electronPath points nowhere.",
+            world: { electron: "missing", electronDownload: { pauseAt: 0.35 } },
+            async run(t) {
+                await open(t);
+                await t.webview.do("wait", "#runtime progress");
+                await t.wait(800);
+                await t.screen("downloading", "Downloading", "Opening Euterpe's settings starts the download (so does clicking Euterpe): a banner at the top, with its progress and a way to cancel it. The bench holds the download here.");
+                await t.webview.do("click", '[data-run="cancelRuntime"]');
+                await t.webview.do("wait", '#runtime [data-run="downloadRuntime"]');
+                await t.wait(500);
+                await t.screen("cancelled", "Cancelled", "The banner stays, with a way to download it after all. Opening the window again doesn't start it again; clicking Euterpe does.");
+                t.world.spec.electronDownload = { status: 404 };
+                await t.webview.do("click", '[data-run="downloadRuntime"]');
+                await t.webview.do("wait", "#runtime:not(.banner-runtime)");
+                await t.wait(500);
+                await t.screen("failed", "The download fails", "Why, and a way to try again.");
+                await t.set("electronPath", `${t.world.home}\\tools\\electron\\electron.exe`);
+                await t.webview.do("wait", '#runtime [data-run="electronSetting"]');
+                await t.wait(500);
+                await t.screen("setting", "euterpe.electronPath points nowhere", "A download wouldn't help: the way to the setting, in VS Code's Settings editor (it isn't in this window).");
             },
         },
         {

@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
-import { claudeCandidates, compareVersions, Machine, MIN_CLAUDE_VERSION, parseClaudeVersion, resolveClaude } from "../claudeCli";
+import { claudeCandidates, ClaudeNotFound, compareVersions, Machine, MIN_CLAUDE_VERSION, parseClaudeVersion, resolveClaude } from "../claudeCli";
 
 const quiet = () => { /* no log */ };
 
@@ -68,7 +68,10 @@ test("resolveClaude takes the first recent Claude Code and explains every failur
     const found = await resolveClaude("", "/ext/claude", {}, quiet, m, probe);
     assert.deepEqual(found, { path: "/ext/claude", source: "Claude Code VS Code extension", version: "2.1.283" });
 
-    await assert.rejects(resolveClaude("", null, {}, quiet, m, probe), new RegExp(`2\\.1\\.100 .* needs ${MIN_CLAUDE_VERSION.replace(/\./g, "\\.")}`));
-    await assert.rejects(resolveClaude("", null, {}, quiet, mac([], ""), probe), /isn't installed/);
-    await assert.rejects(resolveClaude("/custom/claude", null, {}, quiet, m, probe), /euterpe\.claudePath is set to \/custom\/claude/);
+    await assert.rejects(resolveClaude("", null, {}, quiet, m, probe), (err: Error) =>
+        new RegExp(`2\\.1\\.100 .* needs ${MIN_CLAUDE_VERSION.replace(/\./g, "\\.")}`).test(err.message) && !(err instanceof ClaudeNotFound));
+    // Nowhere at all: the one failure that offers the other minds (extension.ts).
+    await assert.rejects(resolveClaude("", null, {}, quiet, mac([], ""), probe), (err: Error) => /isn't installed/.test(err.message) && err instanceof ClaudeNotFound);
+    await assert.rejects(resolveClaude("/custom/claude", null, {}, quiet, m, probe), (err: Error) =>
+        /euterpe\.claudePath is set to \/custom\/claude/.test(err.message) && !(err instanceof ClaudeNotFound));
 });

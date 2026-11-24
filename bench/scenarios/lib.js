@@ -19,6 +19,20 @@ async function startSession(t, { hello = HELLO, command = "euterpe.startSession"
     return turn;
 }
 
+/**
+ * The writer clicks Euterpe (`command`), but something in the settings stands in the way: Euterpe's
+ * settings window opens instead of a session (extension.ts, showSettings). Waits until it has, and
+ * shows `selector` (by default, the callout saying what's missing).
+ */
+async function settingsInstead(t, { command = "euterpe.startSession", selector = ".need" } = {}) {
+    const opened = () => (t.output().match(/Euterpe's settings, at /g) || []).length;
+    const before = opened();
+    t.run(command);
+    await t.until(() => opened() > before, { what: "Euterpe's settings to open instead of a session" });
+    await t.webview.do("wait", selector);
+    await t.wait(700);
+}
+
 /** The writer says something to Euterpe in the overlay's chat, and the mind answers `reply`. */
 async function chat(t, text, reply, { open = true } = {}) {
     const turn = t.mind.turn({ kind: "chat" });
@@ -84,4 +98,4 @@ You say little, and you say it in images. When a sentence lands, you tell them w
 When one doesn't, you point at the word that's almost right, and you let them find the right one.
 `;
 
-module.exports = { HELLO, startSession, chat, SPROUT, NIGHT_OWL, BROKEN, POET, packFrom };
+module.exports = { HELLO, startSession, settingsInstead, chat, SPROUT, NIGHT_OWL, BROKEN, POET, packFrom };

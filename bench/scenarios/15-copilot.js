@@ -1,7 +1,7 @@
 // Chapter 15: Euterpe's mind on the models the writer's GitHub Copilot plan offers in VS Code.
 "use strict";
 
-const { HELLO, startSession, chat } = require("./lib");
+const { HELLO, startSession, settingsInstead, chat } = require("./lib");
 
 /** On Copilot, signed in to it; `access`: VS Code's answer to Euterpe (undefined: it hasn't asked yet). */
 const copilot = (extra = {}) => ({ provider: "copilot", ...extra });
@@ -44,7 +44,7 @@ module.exports = {
                 await t.webview.do("top");
                 await t.screen("switch", "GitHub Copilot", "The mind's third choice, in GitHub's purple. Right under it, Copilot as VS Code has it: not signed in yet, and the way to VS Code's Copilot setup.");
                 await t.webview.do("scroll", "#mind");
-                await t.screen("no-models", "No models yet", "Not until Copilot offers them.");
+                await t.screen("no-models", "No models yet", "Not until the writer signs in.");
                 await t.webview.do("top");
                 await t.webview.do("click", '[data-run="setUpCopilot"]');
                 const setup = await t.modal({ text: /Sign in to use AI Features/ });
@@ -122,21 +122,20 @@ module.exports = {
         },
         {
             id: "copilot-no-models",
-            title: "No Copilot here",
-            summary: "Copilot offers no models (the writer isn't signed in to it): starting a session, then Choose Model.",
+            title: "Not signed in to Copilot",
+            summary: "The writer isn't signed in to GitHub Copilot in VS Code (so it offers Euterpe no models): starting a session, then Choose Model.",
             world: copilot({ copilot: null }),
             async run(t) {
-                t.run("euterpe.startSession");
-                const n = await t.notification({ text: /offers Euterpe no models/ });
-                await t.screen("start", "No models", "With the way to VS Code's Copilot setup.");
-                n.click("Set Up Copilot");
+                await settingsInstead(t, { selector: '[data-run="setUpCopilot"]' });
+                await t.screen("start", "Not signed in", "Euterpe's settings open at the choice of mind, with the way to VS Code's Copilot setup.");
+                await t.webview.do("click", '[data-run="setUpCopilot"]');
                 const setup = await t.modal({ text: /Sign in to use AI Features/ });
                 await t.screen("setup", "VS Code's Copilot setup", "What Set Up Copilot opens: VS Code's own sign-in (the bench's stand-in).");
                 setup.click("Skip for now");
                 await setup.closed;
                 t.run("euterpe.chooseModel");
-                await t.notification({ text: /offers Euterpe no models/ });
-                await t.screen("choose-model", "Choose Model, with no models", "The same, from Choose Model.");
+                await t.notification({ text: /Not signed in to GitHub Copilot/ });
+                await t.screen("choose-model", "Choose Model, signed out", "The same, from Choose Model.");
             },
         },
         {
@@ -145,13 +144,8 @@ module.exports = {
             summary: "euterpe.copilotModel names a model Copilot doesn't offer here (one the writer's plan doesn't include).",
             world: copilot({ settings: { copilotModel: "claude-opus-4.5" } }),
             async run(t) {
-                t.run("euterpe.startSession");
-                const n = await t.notification({ text: /doesn't offer the model/ });
-                await t.screen("error", "Not offered", "With a way to Euterpe's settings.");
-                n.click("Open Settings");
-                await t.webview.do("wait", "#mind");
-                await t.wait(800);
-                await t.screen("settings", "Euterpe's settings, at the Mind", "The model named, among the ones Copilot offers.");
+                await settingsInstead(t);
+                await t.screen("settings", "Not offered", "Euterpe's settings open at the model: the one named, among the ones Copilot offers.");
             },
         },
         {

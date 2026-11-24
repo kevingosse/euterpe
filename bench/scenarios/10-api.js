@@ -1,7 +1,7 @@
 // Chapter 10: Euterpe's mind on an OpenAI-compatible API, with the writer's own key.
 "use strict";
 
-const { HELLO, startSession, chat } = require("./lib");
+const { HELLO, startSession, settingsInstead, chat } = require("./lib");
 
 const OPENAI = "https://api.openai.com/v1";
 const KEY = (origin, key) => ({ [`euterpe.apiKey:${origin}`]: key });
@@ -15,17 +15,21 @@ module.exports = {
         {
             id: "api-first-session",
             title: "The first session on an API",
-            summary: "OpenAI's API, no key yet: Euterpe asks for it.",
+            summary: "OpenAI's API, no key yet: Euterpe's settings open where the key goes; then the session.",
             world: api(OPENAI),
             async run(t) {
-                t.run("euterpe.startSession");
+                await settingsInstead(t, { selector: '[data-run="setApiKey"]' });
+                await t.screen("no-key", "No key yet", "Euterpe's settings open at the choice of mind, where the key goes.");
+                await t.webview.do("click", '[data-run="setApiKey"]');
                 const box = await t.input({ title: /API Key/ });
                 await t.screen("key", "The API key", "Hidden as it's typed, kept in VS Code's secret storage, sent only to the address it's for.");
                 const v = await box.type("sk-proj abc");
                 await t.screen("invalid", "One word, please", `Its validation: "${v}".`);
-                const first = t.mind.turn({ kind: "session_start" });
                 await box.type("sk-proj-bench1234");
                 box.accept();
+                await t.webview.do("wait", ".key-set");
+                const first = t.mind.turn({ kind: "session_start" });
+                t.run("euterpe.startSession");
                 const turn = await first;
                 await t.overlay.ready();
                 const answered = t.session.response();
@@ -56,13 +60,10 @@ module.exports = {
             summary: "euterpe.openaiBaseUrl isn't a web address, or isn't http(s).",
             world: api("api.openai.com/v1"),
             async run(t) {
-                t.run("euterpe.startSession");
-                let n = await t.notification({ text: /isn't a web address/ });
-                await t.screen("not-url", "Not a web address", "With a way to Euterpe's settings.");
-                n.close();
+                await settingsInstead(t);
+                await t.screen("not-url", "Not a web address", "Euterpe's settings open at the choice of mind: the address, and what's wrong with it.");
                 await t.set("openaiBaseUrl", "ftp://models.example.com/v1");
-                t.run("euterpe.startSession");
-                n = await t.notification({ text: /http or https/ });
+                await settingsInstead(t);
                 await t.screen("not-http", "Not http or https", "");
             },
         },
@@ -72,12 +73,8 @@ module.exports = {
             summary: "OpenRouter, with no model named: another provider has no default.",
             world: api("https://openrouter.ai/api/v1", { secrets: KEY("https://openrouter.ai", "sk-or-bench") }),
             async run(t) {
-                t.run("euterpe.startSession");
-                const n = await t.notification({ text: /Which model/ });
-                await t.screen("which", "Which model?", "");
-                n.click("Open Settings");
-                await t.webview.do("wait", "#mind");
-                await t.screen("settings", "Euterpe's settings, at the Mind", "Open Settings opens Euterpe's own settings window at its Mind section.");
+                await settingsInstead(t);
+                await t.screen("settings", "Which model?", "Euterpe's settings open at the model, which asks for one.");
             },
         },
         {

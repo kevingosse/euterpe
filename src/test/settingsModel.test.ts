@@ -4,7 +4,8 @@ import * as path from "node:path";
 import { test } from "node:test";
 import { ATTENTION } from "../attention";
 import { OPENAI_MODELS } from "../models";
-import { AVATAR_SCALES, checkSetting, EFFORTS, MACHINE_SETTINGS, modelViews, OUTSIDE_WINDOW, SETTINGS } from "../settingsModel";
+import { endpointFor } from "../providers";
+import { ApiView, AVATAR_SCALES, checkSetting, EFFORTS, MACHINE_SETTINGS, modelProblem, modelViews, OUTSIDE_WINDOW, SETTINGS } from "../settingsModel";
 
 // The settings package.json contributes, by key (without "euterpe."), across its sections.
 const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "package.json"), "utf8"));
@@ -105,4 +106,24 @@ test("on GitHub Copilot: the models it offers, and the one named if it's none of
     assert.deepEqual(modelViews("", "copilot", true, offered).map((m) => m.id), ["gpt-6.1-sol"], "never OpenAI's picks, whatever the API's address");
     assert.deepEqual(modelViews("gone-model", "copilot", false, offered).map((m) => m.id), ["gpt-6.1-sol", "gone-model"]);
     assert.deepEqual(modelViews("", "copilot", true).map((m) => m.id), []);
+});
+
+test("what keeps a session from starting on the model as set, for the window to show", () => {
+    const view = (url: string, more: Partial<ApiView> = {}): ApiView => ({ value: url, endpoint: endpointFor(url), key: "set", ...more });
+    const offered = [{ id: "auto", name: "Auto", detail: "" }, { id: "gpt-5-mini", name: "GPT-5 mini", detail: "" }];
+    // GitHub Copilot: a model it doesn't offer; Euterpe's pick (empty) or one it offers is fine, and no models is Copilot's own problem.
+    assert.match(modelProblem("copilot", "claude-opus-9", view(""), offered) ?? "", /doesn't offer the model claude-opus-9/);
+    assert.equal(modelProblem("copilot", "", view(""), offered), undefined);
+    assert.equal(modelProblem("copilot", "GPT-5-mini", view(""), offered), undefined);
+    assert.equal(modelProblem("copilot", "claude-opus-9", view(""), []), undefined);
+    // An API without a default needs a model named; OpenAI's has one.
+    assert.match(modelProblem("openai", "", view("https://openrouter.ai/api/v1")) ?? "", /OpenRouter has no default/);
+    assert.equal(modelProblem("openai", "meta-llama/llama-3.3-70b-instruct", view("https://openrouter.ai/api/v1")), undefined);
+    assert.equal(modelProblem("openai", "", view("https://api.openai.com/v1")), undefined);
+    // A ChatGPT plan that answered with no models; not before a sign-in, nor when the list failed (it says so itself).
+    assert.match(modelProblem("openai", "", view("", { account: { email: "w@example.com" } }), []) ?? "", /offers Euterpe no models/);
+    assert.equal(modelProblem("openai", "", view("", { account: null }), undefined), undefined);
+    assert.equal(modelProblem("openai", "", view("", { account: {}, modelsProblem: "OpenAI didn't answer." }), []), undefined);
+    // Claude: Claude Code knows its models.
+    assert.equal(modelProblem("claude", "", view("")), undefined);
 });

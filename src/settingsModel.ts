@@ -3,8 +3,9 @@
 // here before it becomes a setting. vscode-free, for the tests.
 
 import { ATTENTION } from "./attention";
+import type { RuntimeStatus } from "./avatarRuntime";
 import { isMascotId, Mascot } from "./mascots";
-import { modelName, modelsFor, sameModel } from "./models";
+import { defaultModel, modelName, modelsFor, sameModel } from "./models";
 import { isPersonaId, Persona } from "./personas";
 import { Endpoint, PROVIDERS, Provider } from "./providers";
 import type { StartedWith } from "./session";
@@ -124,6 +125,17 @@ export interface ApiView {
     modelsProblem?: string;
 }
 
+/** Claude Code as a session would find it: for the choice of mind, and Setup. */
+export interface ClaudeFound {
+    ok: boolean;
+    /** Its version, when it's there. */
+    version?: string;
+    /** Nowhere Euterpe looks (rather than too old, or not what euterpe.claudePath names). */
+    missing?: boolean;
+    /** What Setup says: the one in use, or what's wrong. */
+    text: string;
+}
+
 /** A path setting, as the window shows it. */
 export interface PathView {
     value: string;
@@ -137,6 +149,8 @@ export interface SettingsState {
     /** Workspace Trust: without it, no session starts. */
     trusted: boolean;
     session: "none" | "starting" | "active";
+    /** The avatar's runtime (Electron): the banner says how its download is going, until it's there. */
+    runtime: RuntimeStatus;
     /** What the mind runs on, from the next session: the window wears its colours. */
     provider: Provider;
     /** What the running session's mind runs on, during one. */
@@ -160,6 +174,8 @@ export interface SettingsState {
     models: ModelView[];
     /** What an empty model setting means: Euterpe's default on Claude and on OpenAI's API, its pick on a ChatGPT plan or GitHub Copilot, none elsewhere. */
     modelDefault: string;
+    /** Why no session could start on the model as set: none named where there's no default, one GitHub Copilot doesn't offer, a plan that offers none. */
+    modelProblem?: string;
     /** The model the mind runs on now, during a session. */
     liveModel?: string;
     paths: Record<PathSetting, PathView>;
@@ -172,6 +188,24 @@ export const personaView = (p: Persona): PersonaView =>
 
 export const mascotView = (m: Mascot): MascotView =>
     ({ id: m.id, name: m.name, description: m.description, body: m.body, bundled: m.bundled, pack: m.pack });
+
+/**
+ * Why no session could start on the model as set (`chosen`: the provider's model setting), given
+ * the models a plan or GitHub Copilot offers (`listed`); undefined when nothing's in the way. What the
+ * mind itself needs (Claude Code, a key, a sign-in) is the provider's business, not the model's.
+ */
+export function modelProblem(provider: Provider, chosen: string, api: ApiView, listed?: readonly ModelView[]): string | undefined {
+    const model = chosen.trim();
+    if (provider === "copilot") {
+        return listed?.length && model && !listed.some((m) => sameModel(m.id, model)) ? `GitHub Copilot doesn't offer the model ${model} here: choose another.` : undefined;
+    }
+    if (provider !== "openai" || !api.endpoint) { return undefined; }
+    if (api.endpoint.chatgpt) {
+        // (signed in, and the plan answered: a list that failed says so itself)
+        return api.account && listed && !listed.length && !api.modelsProblem ? "Your ChatGPT plan offers Euterpe no models." : undefined;
+    }
+    return model || defaultModel("openai", api.endpoint.openai) ? undefined : `Name the model Euterpe should think with: ${api.endpoint.name} has no default.`;
+}
 
 /**
  * The models to choose from: Euterpe's picks (Claude's; OpenAI's on OpenAI's own API), or the

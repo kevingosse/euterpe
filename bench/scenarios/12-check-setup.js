@@ -42,7 +42,7 @@ module.exports = {
         {
             id: "check-electron-only",
             title: "All good but the avatar's runtime",
-            summary: "Electron isn't downloaded yet: the first session would offer to. Check Setup can download it now.",
+            summary: "Electron isn't downloaded yet: clicking Euterpe would download it. Check Setup can download it now.",
             world: { electron: "missing" },
             async run(t) {
                 t.run("euterpe.checkSetup");
@@ -54,7 +54,7 @@ module.exports = {
                 t.run("euterpe.checkSetup");
                 const again = await t.notification({ text: /except for its avatar runtime/, timeout: 40_000 });
                 again.click("Download Now");
-                await t.progress({ title: /Downloading/ });
+                await t.progress({ title: /Getting Euterpe's avatar ready/ });
                 await t.screen("downloading", "Downloading from Check Setup", "");
             },
         },

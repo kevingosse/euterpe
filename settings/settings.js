@@ -63,7 +63,8 @@
         seen: !!saved.seen,                  // the page was here before: Euterpe is already on stage
     };
     const keep = () => vscode.setState({ read: [...ui.read], setupOpen: ui.setupOpen, seen: true });
-    let detected = null;                     // Claude Code as found, for Setup
+    let detected = null;                     // Claude Code as found, for the choice of mind and Setup
+    const CLAUDE_PATHS = ["claudePath", "claudeConfigDir"];   // the settings that decide which Claude Code that is
     let listed = null;                       // the models the API lists: { ids } or { problem }, for its model field
     let otherUrl = false;                    // the writer is typing an address of their own
     const send = (msg) => vscode.postMessage(msg);
@@ -73,6 +74,7 @@
         if (key === "mascot") state.mascot = value;
         if (key === "provider") state.provider = value;
         if (key === "openaiBaseUrl") listed = null;
+        if (CLAUDE_PATHS.includes(key)) detected = null;
         render();
         send({ type: "set", key, value });
     };
@@ -85,6 +87,7 @@
         for (const p of ["openai", "copilot"]) document.body.classList.toggle(`provider-${p}`, state.provider === p);   // (the provider's colour)
         app.innerHTML = piece(h`
             ${header()}
+            ${runtimeBanner()}
             ${providerSwitch()}
             ${nav()}
             ${state.trusted ? "" : h`<div class="banner" role="status">
@@ -113,14 +116,51 @@
     }
 
     /**
+     * The avatar's runtime (Electron), until it's there: its download, under way in the background
+     * from the moment the writer clicked Euterpe or opened this window, or what stands in its way.
+     */
+    function runtimeBanner() {
+        const r = state.runtime;
+        if (!r || r.kind === "ready") return "";
+        const mb = (n) => Math.round(n / 1048576);
+        const body = r.kind === "downloading" ? h`<div class="runtime-text">
+                    <p><strong>Getting Euterpe's avatar ready</strong> <span class="muted">· Electron, once${r.total ? `: ${mb(r.received)} of ${mb(r.total)} MB` : `: ${mb(r.received)} MB`}</span></p>
+                    <progress max="${r.total || 1}" value="${r.total ? r.received : 0}" aria-label="Downloading Electron"></progress>
+                </div>
+                <button class="link" data-run="cancelRuntime">Cancel</button>`
+            : r.kind === "unpacking" ? h`<div class="runtime-text">
+                    <p><strong>Getting Euterpe's avatar ready</strong> <span class="muted">· unpacking Electron…</span></p>
+                    <progress max="1" value="1" aria-label="Unpacking Electron"></progress>
+                </div>`
+            : r.kind === "failed" ? h`<p class="runtime-text"><strong>Euterpe's avatar couldn't be downloaded.</strong> ${r.message}</p>
+                <button class="btn btn-primary" data-run="downloadRuntime">Try Again</button>`
+            : r.kind === "problem" ? h`<p class="runtime-text">${r.message}</p>
+                ${r.setting ? h`<button class="btn" data-run="electronSetting">Open the Setting</button>` : ""}`
+            // missing, or cancelled
+            : h`<p class="runtime-text"><strong>Euterpe's avatar runs on Electron, which isn't downloaded yet</strong> <span class="muted">(about 150 MB, once).</span></p>
+                <button class="btn btn-primary" data-run="downloadRuntime">Download</button>`;
+        const trouble = r.kind === "failed" || r.kind === "problem";
+        return h`<div id="runtime" class="banner${trouble ? "" : " banner-runtime"}" role="status">${body}</div>`;
+    }
+
+    /** The runtime moved on: the banner alone, redrawn in place (the whole page when it comes or goes). */
+    function updateRuntime(r) {
+        state.runtime = r;
+        const el = document.getElementById("runtime");
+        const html = piece(runtimeBanner());
+        if (el && html) el.outerHTML = html;
+        else if (el || html) render();
+    }
+
+    /**
      * What the mind runs on: everything below follows it, colours included. Right under it, what it
-     * takes: the API and its key, the ChatGPT sign-in, Copilot in VS Code (Claude Code has its own login).
+     * takes: the API and its key, the ChatGPT sign-in, Copilot in VS Code, Claude Code (which has its own login).
      */
     function providerSwitch() {
         const p = PROVIDERS.find(([v]) => v === state.provider) || PROVIDERS[0];
         const other = state.session === "active" && state.liveProvider && state.liveProvider !== state.provider;
         const liveName = other ? (PROVIDERS.find(([v]) => v === state.liveProvider) || PROVIDERS[0])[1] : "";
-        const access = state.provider === "openai" ? apiFields() : onCopilot() ? copilotField() : "";
+        const access = state.provider === "openai" ? apiFields() : onCopilot() ? copilotField() : claudeField();
         return h`<div id="provider" class="provider-block">
             <div class="provider" role="group" aria-labelledby="provider-label">
                 <span class="provider-label" id="provider-label">Mind</span>
@@ -273,8 +313,9 @@
         return section("mind", "Mind", "How Euterpe thinks", "",
             h`<div class="field">
                 <div class="field-label">Model ${ws(modelKey())}</div>
+                ${state.modelProblem ? need(state.modelProblem) : ""}
                 ${models.length ? h`<div class="grid grid-choices">${models}</div>` : ""}
-                ${copilotProblem ? h`<p class="muted small">Copilot's models appear here once VS Code has them.</p>` : ""}
+                ${copilotProblem ? h`<p class="muted small">Copilot's models appear here once you're signed in.</p>` : ""}
                 ${onCopilot() ? "" : signedOut ? h`<p class="muted small">Sign in with ChatGPT to see the models your plan offers.</p>` : h`<form class="other-model" data-form="model">
                     <label for="other-model">${another}</label>
                     <input id="other-model" type="text" spellcheck="false" autocomplete="off" placeholder="${claude() ? "model name" : onOpenAI() || onPlan() ? "gpt-5.6-sol" : "model id"}" data-focus="other-model"${ids ? raw(' list="api-models"') : ""}>
@@ -284,7 +325,6 @@
                 ${ids ? h`<datalist id="api-models">${ids.map((id) => h`<option value="${id}"></option>`)}</datalist>` : ""}
                 ${own && listed && listed.problem ? h`<p class="small problem">${listed.problem}</p>` : ""}
                 ${onPlan() && state.api.modelsProblem ? h`<p class="small problem">${state.api.modelsProblem}</p>` : ""}
-                ${state.provider === "openai" && !current && !onPlan() ? h`<p class="small problem">Name the model Euterpe should think with: ${state.api.endpoint ? state.api.endpoint.name : "your provider"} has no default.</p>` : ""}
             </div>
             <div class="field">
                 <div class="field-label">Effort ${ws("effort")} ${later("effort")}</div>
@@ -319,8 +359,8 @@
         const key = api.key === "local" ? h`<p class="key-line"><span class="key-dot key-local" aria-hidden="true"></span>No key needed: ${ep.name} runs on this computer.</p>`
             : api.key === "set" ? h`<p class="key-line"><span class="key-dot key-set" aria-hidden="true"></span>Euterpe has your key for ${where}.
                 <button class="link" data-run="setApiKey">Change…</button> <button class="link" data-run="removeApiKey">Forget it</button></p>`
-            : h`<p class="key-line"><span class="key-dot key-missing" aria-hidden="true"></span>${ep ? `No key yet for ${where}.` : "Set a valid address first."}
-                ${ep ? h`<button class="btn" data-run="setApiKey">Set API Key…</button>` : ""}</p>`;
+            : ep ? need(`No key yet for ${where}.`, h`<button class="btn btn-primary" data-run="setApiKey">Set API Key…</button>`)
+            : h`<p class="key-line"><span class="key-dot key-missing" aria-hidden="true"></span>Set a valid address first.</p>`;   // (the address is the problem: called out above)
         const plan = !!ep && ep.chatgpt;
         const how = !ep ? "" : plan ? " · the Responses API, on your ChatGPT plan, with web search" : ep.openai ? " · the Responses API, with web search" : " · Chat Completions";
         return h`<div class="field">
@@ -329,7 +369,7 @@
                 ${custom ? h`<div class="path-input api-url">
                     <input id="api-url" type="text" spellcheck="false" autocomplete="off" value="${api.value}" placeholder="https://api.openai.com/v1" data-url="openaiBaseUrl" data-focus="api-url" aria-label="The API's base URL">
                 </div>` : ""}
-                ${api.problem ? h`<p class="small problem">${api.problem}</p>` : ep ? h`<p class="small muted path-hint">${ep.baseURL}${how}</p>` : ""}
+                ${api.problem ? need(api.problem) : ep ? h`<p class="small muted path-hint">${ep.baseURL}${how}</p>` : ""}
             </div>
             ${plan ? accountField() : h`<div class="field">
                 <div class="field-label">API key</div>
@@ -345,10 +385,33 @@
         const account = state.copilot && state.copilot.account;
         return h`<div class="field">
                 <div class="field-label">GitHub Copilot</div>
-                ${problem ? h`<p class="key-line"><span class="key-dot key-missing" aria-hidden="true"></span>${problem}
-                    <button class="btn" data-run="setUpCopilot">Set Up Copilot…</button></p>`
+                ${problem ? need(problem, h`<button class="btn btn-primary" data-run="setUpCopilot">Set Up Copilot…</button>`)
                     : h`<p class="key-line"><span class="key-dot key-set" aria-hidden="true"></span><span>Signed in${account ? h` as <strong>${account}</strong>` : ""}, in VS Code.</span>
                         <button class="link" data-run="manageAccounts">Manage accounts</button></p>`}
+            </div>`;
+    }
+
+    /** Claude Code, as a session would find it: there, or what's wrong (with the way to fix it). */
+    function claudeField() {
+        const folder = state.paths.claudeConfigDir.problem;
+        const line = folder ? need(folder, h`<button class="btn btn-primary" data-run="browse" data-arg="claudeConfigDir">Choose a Folder…</button>`)
+            : !detected ? h`<p class="key-line"><span class="key-dot" aria-hidden="true"></span>Looking for Claude Code…</p>`
+            : detected.ok ? h`<p class="key-line"><span class="key-dot key-set" aria-hidden="true"></span>Claude Code ${detected.version} is installed.</p>`
+            : detected.missing ? need("Claude Code isn't installed.", h`<button class="btn btn-primary" data-run="installClaude">Install Claude Code…</button>`)
+            // too old, or not what euterpe.claudePath names
+            : need(detected.text, state.values.claudePath ? h`<button class="btn btn-primary" data-run="browse" data-arg="claudePath">Choose a File…</button>` : "");
+        return h`<div class="field">
+                <div class="field-label">Claude Code</div>
+                ${line}
+            </div>`;
+    }
+
+    /** What the chosen mind still needs before a session can start, where nobody can miss it: what's missing, and the way to it. */
+    function need(text, button = "") {
+        return h`<div class="need">
+                <span class="need-mark" aria-hidden="true">!</span>
+                <p class="need-text">${text}</p>
+                ${button}
             </div>`;
     }
 
@@ -359,8 +422,7 @@
                 <button class="link" data-run="cancelSignIn">Cancel</button></p>`
             : a ? h`<p class="key-line"><span class="key-dot key-set" aria-hidden="true"></span><span>Signed in${a.email ? h` as <strong>${a.email}</strong>` : ""}. Using ChatGPT plan.</span>
                 <button class="link" data-run="manageUsage">Manage usage</button> <button class="link" data-run="signOut">Sign out</button></p>`
-            : h`<p class="key-line"><span class="key-dot key-missing" aria-hidden="true"></span>${api.ended || "Not signed in yet."}
-                <button class="btn" data-run="signIn">Continue with ChatGPT…</button></p>`;
+            : need(api.ended || "Not signed in yet.", h`<button class="btn btn-primary" data-run="signIn">Continue with ChatGPT…</button>`);
         return h`<div class="field">
                 <div class="field-label">ChatGPT account</div>
                 ${line}
@@ -530,7 +592,9 @@
             send({ type: "detect" });
         }
         const target = document.getElementById(id);
-        target.scrollIntoView({ behavior: reduced() ? "auto" : "smooth", block: "start" });
+        // The choice of mind is at the top: the page's top, so the banner above it (the avatar's download) shows too.
+        if (id === "provider") window.scrollTo({ top: 0, behavior: reduced() ? "auto" : "smooth" });
+        else target.scrollIntoView({ behavior: reduced() ? "auto" : "smooth", block: "start" });
         target.classList.remove("flash");
         void target.offsetWidth;
         target.classList.add("flash");
@@ -552,19 +616,22 @@
     window.addEventListener("message", (e) => {
         const msg = e.data;
         if (msg.type === "state") {
-            const first = !state;
+            if (state && CLAUDE_PATHS.some((k) => state.values[k] !== msg.state.values[k])) detected = null;   // another Claude Code, maybe
             state = msg.state;
             render();
-            if (first && ui.setupOpen) send({ type: "detect" });
+            // Claude Code, for the choice of mind and Setup: looked for again while it isn't there (it may have just been installed)
+            if (claude() && (!detected || !detected.ok)) send({ type: "detect" });
+        } else if (msg.type === "runtime") {
+            if (state) updateRuntime(msg.runtime);
         } else if (msg.type === "focus") {
             goTo(msg.section);
         } else if (msg.type === "models") {
             listed = msg.ids ? { ids: msg.ids } : { problem: msg.problem || "No models listed." };
             render();
         } else if (msg.type === "detected") {
+            const same = detected && JSON.stringify(detected) === JSON.stringify(msg.claude);
             detected = msg.claude;
-            const hint = app.querySelector("#path-claudePath")?.closest(".path-row")?.querySelector(".path-hint");
-            if (hint && !state.paths.claudePath.value) hint.innerHTML = piece(detected.ok ? detected.text : h`<span class="problem">${detected.text}</span>`);
+            if (!same) render();
         }
     });
 

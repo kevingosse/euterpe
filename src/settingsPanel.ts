@@ -10,9 +10,10 @@ import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
 import { ChatGptLogin, EndedLogin, MANAGE_USAGE_URL, planDefault, PlanModel } from "./chatgpt";
-import { resolveClaude } from "./claudeCli";
+import type { RuntimeStatus } from "./avatarRuntime";
+import { CLAUDE_SETUP_URL, ClaudeNotFound, resolveClaude } from "./claudeCli";
 import { UnknownSettingError, updateSetting } from "./config";
-import { copilotDefault, copilotDetail } from "./copilot";
+import { COPILOT_SIGNED_OUT, copilotDefault, copilotDetail } from "./copilot";
 import { chooseMascot, defaultMascot, listMascots } from "./mascots";
 import {
     installMascot, makeWithEuterpe, MascotHost, mascotDirs, openMascotGuide, openMascotsFolder, previewMascot, wearMascot,
@@ -26,12 +27,17 @@ import { choosePersona, listPersonas } from "./personas";
 import { Endpoint, endpointFor, Provider, providerFor } from "./providers";
 import { expandHome, memoryDir, resolveConfigDir } from "./session";
 import {
-    ApiView, checkSetting, MACHINE_SETTINGS, mascotView, ModelView, modelViews, PATH_SETTINGS, PathSetting, PathView, personaView, SETTINGS,
+    ApiView, checkSetting, ClaudeFound, MACHINE_SETTINGS, mascotView, modelProblem, ModelView, modelViews, PATH_SETTINGS, PathSetting, PathView, personaView, SETTINGS,
     SettingKey, SettingsState, SettingValue,
 } from "./settingsModel";
 
 export interface SettingsHost extends MascotHost, PersonaHost, ModelHost {
     sessionState(): SettingsState["session"];
+    /** The avatar's runtime (Electron): there, downloading, or why not (avatarRuntime.ts). */
+    runtime(): RuntimeStatus;
+    /** Begin its download if it's missing (`again`: also after one failed or was cancelled). */
+    prepareRuntime(again?: boolean): void;
+    cancelRuntime(): void;
     /** The CLI inside the Claude Code VS Code extension, if it's installed. */
     bundledClaude(): string | null;
     /** The writer's key for an API (from VS Code's secret storage), if there's one. */
@@ -92,13 +98,17 @@ export class SettingsPanel implements vscode.Disposable {
     private refreshTimer: NodeJS.Timeout | undefined;
     /** A section to show once the page is ready. */
     private pendingSection: string | undefined;
-    /** Claude Code as found for the Setup section: found once per setting. */
-    private detected: { key: string; text: Promise<{ ok: boolean; text: string }> } | undefined;
+    /** Claude Code as found, for the choice of mind and the Setup section: once per setting (`found`, once it's known). */
+    private detected: { key: string; result: Promise<ClaudeFound>; found?: ClaudeFound } | undefined;
     /** The models the ChatGPT plan offers, as last listed for its account. */
     private plan: { account: string; at: number; models: Promise<PlanModel[]> } | undefined;
 
-    /** Open the window (or bring it forward), at `section` if one is named. */
+    /**
+     * Open the window (or bring it forward), at `section` if one is named. The avatar's runtime
+     * starts downloading if it's missing: a writer here is setting Euterpe up for a session.
+     */
     static show(host: SettingsHost, section?: unknown): void {
+        host.prepareRuntime();
         const at = typeof section === "string" && SECTIONS.includes(section) ? section : undefined;
         if (SettingsPanel.current) {
             SettingsPanel.current.panel.reveal();
@@ -120,6 +130,11 @@ export class SettingsPanel implements vscode.Disposable {
     /** Something the window shows changed outside it (a session started or ended). */
     static refresh(): void {
         SettingsPanel.current?.scheduleRefresh();
+    }
+
+    /** The avatar's runtime moved on (a download's progress, its end): the banner alone follows, not the whole window. */
+    static runtime(status: RuntimeStatus): void {
+        void SettingsPanel.current?.panel.webview.postMessage({ type: "runtime", runtime: status });
     }
 
     private static options(host: SettingsHost): vscode.WebviewOptions & vscode.WebviewPanelOptions {
@@ -268,6 +283,10 @@ export class SettingsPanel implements vscode.Disposable {
             case "signOut": await host.signOut(); this.plan = undefined; break;
             case "listModels": void this.listModels(); break;
             case "setUpCopilot": await host.setUpCopilot(); break;
+            case "installClaude": await vscode.env.openExternal(vscode.Uri.parse(CLAUDE_SETUP_URL)); break;
+            case "downloadRuntime": host.prepareRuntime(true); break;
+            case "cancelRuntime": host.cancelRuntime(); break;
+            case "electronSetting": await vscode.commands.executeCommand("workbench.action.openSettings", "euterpe.electronPath"); break;
             case "manageAccounts": await manageAccounts(); break;
             case "startSession": await host.startSession(); break;
         }
@@ -324,21 +343,28 @@ export class SettingsPanel implements vscode.Disposable {
         if (uri) { await updateSetting(key, uri.fsPath); }
     }
 
-    /** Claude Code as a session would find it, for the Setup section (it runs `claude --version`). */
+    /**
+     * Claude Code as a session would find it (it runs `claude --version`), for the choice of mind and
+     * the Setup section. One that wasn't found is looked for again at the next ask: the writer may
+     * have just installed it.
+     */
     private async detect(): Promise<void> {
         const cfg = vscode.workspace.getConfiguration("euterpe");
         const setting = cfg.get<string>("claudePath") || "";
         const key = `${setting}\n${cfg.get<string>("claudeConfigDir") || ""}`;
-        if (this.detected?.key !== key) {
+        if (this.detected?.key !== key || this.detected.found?.ok === false) {
             let configDir = "";
             try { configDir = resolveConfigDir(cfg.get<string>("claudeConfigDir") || ""); } catch { /* shown as the folder's problem */ }
-            this.detected = {
+            const detected: NonNullable<SettingsPanel["detected"]> = {
                 key,
-                text: resolveClaude(setting, this.host.bundledClaude(), buildMindEnv(process.env, configDir), () => { /* the result says it */ })
-                    .then((c) => ({ ok: true, text: `In use: Claude Code ${c.version}, ${c.path}` }), (err: Error) => ({ ok: false, text: err.message })),
+                result: resolveClaude(setting, this.host.bundledClaude(), buildMindEnv(process.env, configDir), () => { /* the result says it */ })
+                    .then((c): ClaudeFound => ({ ok: true, version: c.version, text: `In use: Claude Code ${c.version}, ${c.path}` }),
+                        (err: Error): ClaudeFound => ({ ok: false, missing: err instanceof ClaudeNotFound, text: err.message })),
             };
+            void detected.result.then((found) => { detected.found = found; });
+            this.detected = detected;
         }
-        const claude = await this.detected.text;
+        const claude = await this.detected.result;
         void this.panel.webview.postMessage({ type: "detected", claude });
     }
 
@@ -376,7 +402,7 @@ export class SettingsPanel implements vscode.Disposable {
                 const models = await host.copilotModels();
                 const pick = copilotDefault(models);
                 listed = models.map((m) => ({ id: m.id, name: m.name, detail: copilotDetail(m.id, pick) }));
-                copilot = models.length ? { account: await githubAccount() } : { problem: "GitHub Copilot offers Euterpe no models: sign in to GitHub Copilot in VS Code first." };
+                copilot = models.length ? { account: await githubAccount() } : { problem: COPILOT_SIGNED_OUT };
             } catch (err) {
                 listed = [];
                 copilot = { problem: (err as Error).message };
@@ -385,6 +411,7 @@ export class SettingsPanel implements vscode.Disposable {
         return {
             trusted: vscode.workspace.isTrusted,
             session: host.sessionState(),
+            runtime: host.runtime(),
             provider,
             liveProvider: active?.provider,
             api,
@@ -399,6 +426,7 @@ export class SettingsPanel implements vscode.Disposable {
             defaultMascot: defaultMascot(provider),
             models: modelViews(liveModel ?? String(values[modelKey] ?? ""), provider, api.endpoint?.openai ?? false, listed),
             modelDefault: provider === "copilot" ? copilotDefault(listed ?? []) ?? "" : listed ? planDefault(listed) ?? "" : defaultModel(provider, api.endpoint?.openai ?? false),
+            modelProblem: modelProblem(provider, String(values[modelKey] ?? ""), api, listed),
             liveModel,
             paths: this.paths(values),
             home: memoryDir(),

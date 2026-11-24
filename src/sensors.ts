@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { Attention, ATTENTION } from "./attention";
-import { DocSnapshot, PerceptionReason, Position, REASON_PRIORITY, SensorState } from "./perception";
+import { DocSnapshot, NoDocument, PerceptionReason, Position, REASON_PRIORITY, SensorState } from "./perception";
 
 // These constants, and the cadence in attention.ts, are cost/latency throttles for how often the
 // mind is woken — they carry no behavioral policy. Deciding what a pause (or an idle half hour)
@@ -49,10 +49,11 @@ export function displayName(uri: vscode.Uri): string {
 /**
  * Pure sensor: records raw activity on the document the writer is working on
  * (following the active editor) and wakes the mind on a cost-bounded cadence.
- * Snapshots are taken on demand, when a turn is actually sent.
+ * Snapshots are taken on demand, when a turn is actually sent. A session can
+ * start with no document open: the first one the writer opens is the one.
  */
 export class Sensors implements vscode.Disposable {
-    private document: vscode.TextDocument;
+    private document: vscode.TextDocument | undefined;
     private edits: EditRecord[] = [];
     private lastEditAt: number | null = null;
     private saves = new Map<string, number>();
@@ -76,22 +77,30 @@ export class Sensors implements vscode.Disposable {
     private ownEdits = 0;
 
     constructor(
-        document: vscode.TextDocument,
+        document: vscode.TextDocument | undefined,
         private readonly events: SensorEvents,
         private readonly options: SensorOptions = { attention: ATTENTION.close, follow: true },
     ) {
         this.document = document;
-        const editor = vscode.window.visibleTextEditors.find((e) => e.document === document);
-        if (editor) { this.selections.set(document.uri.toString(), editor.selection); }
+        const editor = document && vscode.window.visibleTextEditors.find((e) => e.document === document);
+        if (editor) { this.selections.set(editor.document.uri.toString(), editor.selection); }
     }
 
-    get watched(): vscode.TextDocument {
+    /** The document Euterpe reads; undefined until the writer opens one. */
+    get watched(): vscode.TextDocument | undefined {
         return this.document;
     }
 
     /** Start listening, and wake the mind for the session start. */
     start(): void {
         this.running = true;
+        // A document the writer opened while Euterpe was on its way is the session's.
+        const editor = vscode.window.activeTextEditor;
+        if (!this.document && editor && isWatchable(editor.document)) {
+            this.document = editor.document;
+            this.selections.set(editor.document.uri.toString(), editor.selection);
+            this.events.switched(editor.document);
+        }
         this.subscriptions.push(
             vscode.workspace.onDidChangeTextDocument((e) => {
                 if (e.document === this.document && this.ownEdits === 0) { this.onEdit(e); }
@@ -161,8 +170,9 @@ export class Sensors implements vscode.Disposable {
 
     // ---------- snapshots ----------
 
-    snapshot(): DocSnapshot {
+    snapshot(): DocSnapshot | NoDocument {
         const doc = this.document;
+        if (!doc) { return { key: null, workspace: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "(none)" }; }
         const key = doc.uri.toString();
         const active = vscode.window.activeTextEditor;
         const editor = active?.document === doc
@@ -206,7 +216,7 @@ export class Sensors implements vscode.Disposable {
             b.added += r.added;
             b.removed += r.removed;
         }
-        const saved = this.saves.get(this.document.uri.toString());
+        const saved = this.document && this.saves.get(this.document.uri.toString());
         return {
             now: new Date(now),
             focused: this.focused,
@@ -262,7 +272,8 @@ export class Sensors implements vscode.Disposable {
             if (!this.running || now?.document !== target) { return; }
             // Staying with the session's document only goes while it's there: once it's closed (or
             // an untitled one was saved, which closes it for the file), nothing more would be seen.
-            if (!this.options.follow && !this.document.isClosed) { return; }
+            // With none yet, the first one the writer opens is the session's.
+            if (!this.options.follow && this.document && !this.document.isClosed) { return; }
             this.document = target;
             this.selections.set(target.uri.toString(), now.selection);
             this.events.switched(target);

@@ -19,6 +19,8 @@ import type { ApiFailure, ModelApi } from "./openaiMind";
 /** Copilot's models, to VS Code (LanguageModelChat.vendor). */
 export const COPILOT_VENDOR = "copilot";
 export const COPILOT_NAME = "GitHub Copilot";
+/** What no Copilot models in VS Code comes down to: the writer isn't signed in to Copilot there (VS Code's Copilot setup is the way). */
+export const COPILOT_SIGNED_OUT = "Not signed in to GitHub Copilot in VS Code.";
 /** The words with results that have none (see toMessages). */
 export const RESULTS_LINE = "[Results above.]";
 /** What VS Code's consent dialog says Euterpe wants the models for. */

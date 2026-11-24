@@ -187,6 +187,30 @@ test("session_end is announced in the header", () => {
     assert.match(p.text, /VS Code: not focused for 5 min/);
 });
 
+test("with no document open, the perception says so, and the first document is then seen in full", () => {
+    const w = writer();
+    const none = { key: null, workspace: "E:\\blog" } as const;
+    const p = w.render("session_start", none, state({ sinceLastEditMs: null }));
+    assert.match(p.text, /^<euterpe:perception reason="session_start">\n/);
+    assert.match(p.text, /time: Fri 2026-09-25 21:40:12\nfile: none open — workspace: E:\\blog\nVS Code: focused\n/);
+    assert.match(p.text, /document: none — the writer hasn't opened one yet\.\n<\/euterpe:perception>$/);
+    // Nothing that comes with a document: typing, saves, a cursor.
+    assert.doesNotMatch(p.text, /last edit|typing|cursor|<document>/);
+    assert.equal(p.unchanged, false);
+    p.commit();
+
+    const chat = w.render("chat", none, state({ events: ["the writer is wearing Sprout, the mascot you made."] }));
+    assert.match(chat.text, /VS Code: focused\nsince your last look: the writer is wearing Sprout/);
+    chat.commit();
+
+    const first = w.render("doc_switch", doc(), state());
+    assert.equal(first.full, true);
+    assert.match(first.text, /<document>\n# On the large object heap/);
+
+    const end = w.render("session_end", none, state());
+    assert.match(end.text, /the writer is ending the session\.\ndocument: none/);
+});
+
 test("long documents are windowed around the cursor", () => {
     const lines = Array.from({ length: 2000 }, (_, i) => `Paragraph ${i} ` + "x".repeat(60));
     const w = writer({ docCharCap: 5_000 });

@@ -7,6 +7,7 @@ import {
 } from "./chatgpt";
 import { ClaudeInstall, resolveClaude } from "./claudeCli";
 import { COPILOT_VENDOR, copilotApi, copilotDefault, CopilotModel, copilotModelsOf } from "./copilot";
+import { AvatarRuntime } from "./avatarRuntime";
 import { downloadElectron, electronTarget, findElectron } from "./electronRuntime";
 import { chooseMascotCommand, installMascot, previewMascot } from "./mascotCommands";
 import { chooseModelCommand } from "./modelCommands";
@@ -17,18 +18,23 @@ import { CHATGPT_SECRET, Endpoint, endpointFor, Provider, providerFor, secretNam
 import { isWatchable } from "./sensors";
 import { SettingsHost, SettingsPanel } from "./settingsPanel";
 import { checkSetup } from "./setupCheck";
-import { memoryDir, MindRuntime, SessionEvent, WritingSession } from "./session";
+import { memoryDir, MindRuntime, resolveConfigDir, SessionEvent, WritingSession } from "./session";
 
 let session: WritingSession | null = null;
 let starting = false;
 /**
- * A session the writer asked for in Restricted Mode ({ uri, at }, in workspaceState): it starts if
- * they trust the folder within TRUST_WAIT_MS. Kept there rather than in memory: granting trust
- * restarts the extension host when an extension Restricted Mode kept off can't join the running one.
+ * A session the writer asked for in Restricted Mode ({ uri, at }, in workspaceState; uri null: no
+ * document open): it starts if they trust the folder within TRUST_WAIT_MS. Kept there rather than in
+ * memory: granting trust restarts the extension host when an extension Restricted Mode kept off can't
+ * join the running one.
  */
 const AWAITING_TRUST = "awaitingTrust";
 const TRUST_WAIT_MS = 5 * 60_000;
 let trustTimer: NodeJS.Timeout | undefined;
+/** The last document the writer was on, for a session started from elsewhere (Euterpe's settings, say). */
+let lastDocument: vscode.TextDocument | undefined;
+/** Electron, for the avatar's window: found, or downloaded in the background (avatarRuntime.ts). */
+let runtime: AvatarRuntime;
 let statusItem: vscode.StatusBarItem;
 let output: vscode.OutputChannel;
 let root = "";
@@ -75,6 +81,9 @@ const host: SettingsHost = {
     get storageDir() { return storage; },
     get output() { return output; },
     obtainElectron: () => obtainElectron(),
+    runtime: () => runtime.status(),
+    prepareRuntime: (again) => runtime.prepare(again),
+    cancelRuntime: () => runtime.cancel(),
     session: () => session,
     sessionRunning: () => session !== null,
     sessionState: () => (starting ? "starting" : session ? "active" : "none"),
@@ -109,6 +118,14 @@ export function activate(context: vscode.ExtensionContext): EuterpeApi {
     languageModelAccess = context.languageModelAccessInformation;
     output = vscode.window.createOutputChannel("Euterpe");
     statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    runtime = new AvatarRuntime({
+        find: () => findElectron({ override: vscode.workspace.getConfiguration("euterpe").get<string>("electronPath") || "", extensionRoot: root, storageDir: storage }),
+        unbuildable: () => (electronTarget() ? null : `Euterpe's avatar runs on Electron, which has no build for ${process.platform}-${process.arch}.`),
+        download: (hooks) => downloadElectron(storage, { ...hooks, log }),
+        log,
+    });
+    // The settings window's banner follows the download.
+    context.subscriptions.push(runtime.onChange(() => SettingsPanel.runtime(runtime.status())));
 
     context.subscriptions.push(
         output,
@@ -122,7 +139,7 @@ export function activate(context: vscode.ExtensionContext): EuterpeApi {
         vscode.commands.registerCommand("euterpe.showLog", () => output.show()),
         vscode.commands.registerCommand("euterpe.openMemory", openMemory),
         vscode.commands.registerCommand("euterpe.checkSetup", () => checkSetup({
-            output, extensionRoot: root, storageDir: storage, bundledClaude: bundledClaude(), downloadElectron: downloadElectronWithProgress, apiKey,
+            output, extensionRoot: root, storageDir: storage, bundledClaude: bundledClaude(), downloadElectron: obtainElectron, runtime: () => runtime.status(), apiKey,
             chatgptLogin: () => loginStore.load(), chatgptEnded: endedSignIn, planModels: listPlanModels,
             copilotModels: listCopilotModels, copilotAccess,
         })),
@@ -152,6 +169,7 @@ export function activate(context: vscode.ExtensionContext): EuterpeApi {
         // From the diff's title bar the argument is its resource, which names the proposal.
         vscode.commands.registerCommand("euterpe.acceptEdit", (uri?: unknown) => session?.decideEdit(true, EditProposals.idOf(uri))),
         vscode.commands.registerCommand("euterpe.rejectEdit", (uri?: unknown) => session?.decideEdit(false, EditProposals.idOf(uri))),
+        vscode.window.onDidChangeActiveTextEditor((e) => { if (e && isWatchable(e.document)) { lastDocument = e.document; } }),
         vscode.workspace.onDidGrantWorkspaceTrust(() => {
             if (!session && !starting) { setStatus("idle"); }
             // A moment first: a host being restarted for the trust mustn't start what it can't finish.
@@ -161,6 +179,8 @@ export function activate(context: vscode.ExtensionContext): EuterpeApi {
     );
     setStatus("idle");
     statusItem.show();
+    const active = vscode.window.activeTextEditor?.document;
+    if (active && isWatchable(active)) { lastDocument = active; }
     // After a restart for the trust, the new host is the one to start the session.
     void startAfterTrust();
 
@@ -172,6 +192,7 @@ export function activate(context: vscode.ExtensionContext): EuterpeApi {
 
 export function deactivate(): void {
     clearTimeout(trustTimer);
+    runtime?.cancel();   // (what it left behind is swept at the next download)
     session?.dispose();
     session = null;
 }
@@ -231,7 +252,10 @@ function withSettingsLink(text: string): vscode.MarkdownString {
     return md;
 }
 
-/** Start a session on `document`, else on the active editor's. */
+/**
+ * Start a session on `document`, else on the one the writer is on. With none open, Euterpe comes
+ * anyway: it can talk, and reads the first document the writer opens.
+ */
 async function startSession(document?: vscode.TextDocument): Promise<void> {
     if (session || starting) {
         void vscode.window.showInformationMessage(starting ? "Euterpe is on the way." : "A Euterpe session is already running.");
@@ -243,11 +267,11 @@ async function startSession(document?: vscode.TextDocument): Promise<void> {
         void vscode.window.showWarningMessage("Euterpe only supports local folders, not remote windows.");
         return;
     }
-    const doc = document ?? vscode.window.activeTextEditor?.document;
-    if (!doc || !isWatchable(doc)) {
-        void vscode.window.showWarningMessage("Open the document you want to write, then start the session.");
-        return;
-    }
+    // The avatar's runtime, in the background from now on: while the writer sets up the mind, if
+    // that's what's missing, or alongside finding it. (Asking for a session asks for it again, after
+    // a download that failed or was cancelled.)
+    runtime.prepare(true);
+    const doc = document ?? writingDocument();
     if (!vscode.workspace.isTrusted) {
         await askForTrust(doc);
         return;
@@ -255,8 +279,8 @@ async function startSession(document?: vscode.TextDocument): Promise<void> {
     starting = true;
     try {
         const provider = providerFor(vscode.workspace.getConfiguration("euterpe").get("provider"));
-        setStatus("starting");   // the avatar's runtime may have to download first
-        // The mind first: no point downloading Electron for a mind that can't run.
+        setStatus("starting");   // the avatar's runtime may have to finish downloading first
+        // The mind first: one that can't run sends the writer to the settings, the download going on meanwhile.
         const mind = await obtainMind(provider);
         if (!mind) { return; }
         const electron = await obtainElectron();
@@ -300,11 +324,25 @@ async function startSession(document?: vscode.TextDocument): Promise<void> {
 }
 
 /**
+ * The document the writer is on: the active editor's, else one on screen, else the last one they
+ * were on while a tab still holds it; none when there's no text file to read.
+ */
+function writingDocument(): vscode.TextDocument | undefined {
+    const active = vscode.window.activeTextEditor?.document;
+    if (active && isWatchable(active)) { return active; }
+    const onScreen = vscode.window.visibleTextEditors.map((e) => e.document).find(isWatchable);
+    if (onScreen) { return onScreen; }
+    const last = lastDocument?.uri.toString();
+    const tabbed = !!last && vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.input instanceof vscode.TabInputText && t.input.uri.toString() === last));
+    return tabbed && !lastDocument!.isClosed ? lastDocument : undefined;
+}
+
+/**
  * Restricted Mode: the writer hasn't said they trust these files, and the mind would read them
  * with its permission prompts off, where one could carry instructions meant for an agent. So the
  * session waits for trust, and starts on `document` if it's given soon after (startAfterTrust).
  */
-async function askForTrust(document: vscode.TextDocument): Promise<void> {
+async function askForTrust(document: vscode.TextDocument | undefined): Promise<void> {
     const where = vscode.workspace.workspaceFile ? "workspace" : "folder";
     const trust = `Trust This ${where === "folder" ? "Folder" : "Workspace"}…`;
     const pick = await vscode.window.showInformationMessage(`Euterpe waits until you trust this ${where}`, {
@@ -315,26 +353,32 @@ async function askForTrust(document: vscode.TextDocument): Promise<void> {
         ].join("\n\n"),
     }, trust);
     if (pick !== trust) { return; }
-    await workspaceState.update(AWAITING_TRUST, { uri: document.uri.toString(), at: Date.now() });
+    await workspaceState.update(AWAITING_TRUST, { uri: document?.uri.toString() ?? null, at: Date.now() });
     await vscode.commands.executeCommand("workbench.trust.manage");
 }
 
 /** The folder is trusted now: the session the writer asked for in Restricted Mode, if they asked just now. */
 async function startAfterTrust(): Promise<void> {
-    const asked = workspaceState.get<{ uri: string; at: number }>(AWAITING_TRUST);
+    const asked = workspaceState.get<{ uri: string | null; at: number }>(AWAITING_TRUST);
     if (!asked || !vscode.workspace.isTrusted) { return; }
     await workspaceState.update(AWAITING_TRUST, undefined);
     if (session || starting || !(Date.now() - asked.at < TRUST_WAIT_MS)) { return; }
-    let document: vscode.TextDocument;
-    try {
-        document = await vscode.workspace.openTextDocument(vscode.Uri.parse(asked.uri));
-    } catch {
-        return;   // it's gone
+    let document: vscode.TextDocument | undefined;
+    if (asked.uri) {
+        try {
+            document = await vscode.workspace.openTextDocument(vscode.Uri.parse(asked.uri));
+        } catch {
+            return;   // it's gone
+        }
     }
     await startSession(document);
 }
 
-/** What the mind will run on, found (Claude Code) or asked for (an API key); null if there's nothing to run on (and the writer is told why). */
+/**
+ * What the mind will run on: Claude Code, Copilot's models, an API and its key, the ChatGPT sign-in.
+ * Null if something stands in the way, and Euterpe's settings open where it's shown, with the way
+ * to fix it: what's badly set never stops the writer with a dialog.
+ */
 async function obtainMind(provider: Provider): Promise<MindRuntime | null> {
     if (provider === "claude") {
         const claude = await obtainClaude();
@@ -346,61 +390,55 @@ async function obtainMind(provider: Provider): Promise<MindRuntime | null> {
     try {
         endpoint = endpointFor(cfg.get<string>("openaiBaseUrl"));
     } catch (err) {
-        void offerSettings((err as Error).message, "provider");
+        showSettings((err as Error).message, "provider");
         return null;
     }
     if (endpoint.chatgpt) { return obtainPlanMind(endpoint, (cfg.get<string>("openaiModel") ?? "").trim()); }
-    const model = (cfg.get<string>("openaiModel") ?? "").trim() || defaultModel("openai", endpoint.openai);
-    if (!model) {
-        void offerSettings(`Which model should Euterpe's mind run on ${endpoint.name}? Name one in Euterpe's settings (euterpe.openaiModel).`, "mind");
+    const key = await apiKey(endpoint);
+    if (!key && !endpoint.local) {
+        showSettings(`no API key for ${endpoint.origin}`, "provider");
         return null;
     }
-    let key = await apiKey(endpoint);
-    if (!key && !endpoint.local) {
-        key = await askApiKey(endpoint);
-        if (!key) { return null; }
+    const model = (cfg.get<string>("openaiModel") ?? "").trim() || defaultModel("openai", endpoint.openai);
+    if (!model) {
+        showSettings(`no model named for ${endpoint.name} (euterpe.openaiModel), which has no default`, "mind");
+        return null;
     }
     log(`mind: ${model} on ${endpoint.baseURL}${key ? "" : " (no key)"}`);
     return { provider, endpoint, apiKey: key ?? "", model };
 }
 
 /**
- * The mind on the writer's ChatGPT plan: their sign-in (asked for if there's none, or if it ended,
- * before or just now), and the model (Euterpe's pick among the plan's, unless they chose one).
+ * The mind on the writer's ChatGPT plan: their sign-in, and the model (Euterpe's pick among the
+ * plan's, unless they chose one).
  */
 async function obtainPlanMind(endpoint: Endpoint, chosen: string): Promise<MindRuntime | null> {
-    for (let attempt = 1; ; attempt++) {
-        let login = await loginStore.load();
-        if (!login) {
-            const ended = await endedSignIn();
-            const pick = await vscode.window.showInformationMessage(ended ? `${ended.ended} Continue with ChatGPT to start the session.` : "Euterpe thinks on your ChatGPT plan: continue with ChatGPT first.", {
-                modal: true,
-                detail: "Your browser opens ChatGPT's sign-in, where you let Euterpe use your plan (ChatGPT Plus or Pro). Its requests then count toward your plan's usage limits, with no API key.",
-            }, "Continue with ChatGPT");
-            if (pick !== "Continue with ChatGPT") { return null; }
-            login = await signInWithChatGpt();
-            if (!login) { return null; }
-        }
-        const chatgpt = new ChatGptAuth(login, loginStore);
-        let model = chosen;
-        try {
-            const models = await planModels(await chatgpt.headers());
-            if (!model) {
-                model = planDefault(models) ?? "";
-                if (!model) { void offerSettings("Your ChatGPT plan offers Euterpe no models.", "mind"); return null; }
-            } else if (models.length && !models.some((m) => sameModel(m.id, model))) {
-                log(`${model} isn't among your plan's models (${models.map((m) => m.id).join(", ")}): trying it anyway`);
-            }
-        } catch (err) {
-            // It ended just now (OpenAI wouldn't renew it): the writer is asked to sign in again.
-            if (err instanceof SignInNeeded && attempt === 1) { continue; }
-            // A model chosen already can go without the list; Euterpe's pick among the plan's can't.
-            log(`couldn't list your plan's models: ${(err as Error).message}`);
-            if (!model) { void offerSettings((err as Error).message, "mind"); return null; }
-        }
-        log(`mind: ${model} on your ChatGPT plan`);
-        return { provider: "openai", endpoint, apiKey: "", model, chatgpt };
+    const login = await loginStore.load();
+    if (!login) {
+        // (or it ended: the settings window says why)
+        showSettings("not signed in to ChatGPT", "provider");
+        return null;
     }
+    const chatgpt = new ChatGptAuth(login, loginStore);
+    let model = chosen;
+    try {
+        const models = await planModels(await chatgpt.headers());
+        if (!model) {
+            model = planDefault(models) ?? "";
+            if (!model) { showSettings("your ChatGPT plan offers Euterpe no models", "mind"); return null; }
+        } else if (models.length && !models.some((m) => sameModel(m.id, model))) {
+            log(`${model} isn't among your plan's models (${models.map((m) => m.id).join(", ")}): trying it anyway`);
+        }
+    } catch (err) {
+        // It ended just now (OpenAI wouldn't renew it).
+        if (err instanceof SignInNeeded) { showSettings(err.message, "provider"); return null; }
+        // A model chosen already can go without the list; Euterpe's pick among the plan's can't.
+        // (Nothing's badly set: OpenAI didn't answer.)
+        log(`couldn't list your plan's models: ${(err as Error).message}`);
+        if (!model) { void vscode.window.showErrorMessage((err as Error).message); return null; }
+    }
+    log(`mind: ${model} on your ChatGPT plan`);
+    return { provider: "openai", endpoint, apiKey: "", model, chatgpt };
 }
 
 /**
@@ -507,17 +545,18 @@ async function obtainCopilotMind(): Promise<MindRuntime | null> {
     try {
         models = await listCopilotModels();
     } catch (err) {
-        void vscode.window.showErrorMessage((err as Error).message);
+        showSettings((err as Error).message, "provider");
         return null;
     }
     if (!models.length) {
-        void offerCopilotSetup();
+        // The settings window has the way to VS Code's Copilot setup.
+        showSettings("not signed in to GitHub Copilot in VS Code (it offers Euterpe no models)", "provider");
         return null;
     }
     const chosen = (vscode.workspace.getConfiguration("euterpe").get<string>("copilotModel") ?? "").trim();
     const model = models.find((m) => sameModel(m.id, chosen || copilotDefault(models) || ""));
     if (!model) {
-        void offerSettings(`GitHub Copilot doesn't offer the model ${chosen} here: choose another in Euterpe's settings.`, "mind");
+        showSettings(`GitHub Copilot doesn't offer the model ${chosen} here`, "mind");
         return null;
     }
     log(`mind: ${model.id} on GitHub Copilot${chosen ? "" : " (Euterpe's pick)"}, of ${models.map((m) => m.id).join(", ")}`);
@@ -544,13 +583,6 @@ async function copilotAccess(id: string): Promise<boolean | undefined> {
     return chat ? languageModelAccess?.canSendRequest(chat) : undefined;
 }
 
-/** No Copilot models: the writer isn't signed in to GitHub Copilot in VS Code, or has no Copilot. */
-async function offerCopilotSetup(): Promise<void> {
-    const message = "GitHub Copilot offers Euterpe no models: sign in to GitHub Copilot in VS Code first.";
-    log(message);
-    if (await vscode.window.showErrorMessage(message, "Set Up Copilot")) { await setUpCopilot(); }
-}
-
 /** VS Code's own way to sign in to GitHub Copilot (its chat, where an older VS Code has no setup command). */
 async function setUpCopilot(): Promise<void> {
     try {
@@ -560,11 +592,13 @@ async function setUpCopilot(): Promise<void> {
     }
 }
 
-/** A problem the settings window can fix, with a way there. */
-async function offerSettings(message: string, section: string): Promise<void> {
-    log(message);
-    const pick = await vscode.window.showErrorMessage(message, "Open Settings");
-    if (pick) { SettingsPanel.show(host, section); }
+/**
+ * Something in the settings stands in the way: Euterpe's settings window opens where it shows it,
+ * with the way to fix it (the log says what it was). No dialog in the writer's way.
+ */
+function showSettings(why: string, section: "provider" | "mind"): void {
+    log(`Euterpe's settings, at ${section === "provider" ? "the choice of mind" : "the model"}: ${why}`);
+    SettingsPanel.show(host, section);
 }
 
 /** The writer's key for an API, from VS Code's secret storage; undefined if there's none. */
@@ -601,7 +635,7 @@ async function setApiKeyCommand(): Promise<void> {
     try {
         endpoint = endpointFor(vscode.workspace.getConfiguration("euterpe").get<string>("openaiBaseUrl"));
     } catch (err) {
-        void offerSettings((err as Error).message, "provider");
+        showSettings((err as Error).message, "provider");
         return;
     }
     // A plan has a sign-in, not a key.
@@ -627,20 +661,20 @@ async function setApiKeyCommand(): Promise<void> {
     }
 }
 
-/** The Claude Code the mind runs on, or null (and the writer is told why). */
+/**
+ * The Claude Code the mind runs on, or null when it's missing, too old, or not where the settings
+ * say, or when its config folder isn't there: the settings window's choice of mind says which, with
+ * the way out (and the other minds one click away).
+ */
 async function obtainClaude(): Promise<ClaudeInstall | null> {
+    const cfg = vscode.workspace.getConfiguration("euterpe");
     try {
-        const setting = vscode.workspace.getConfiguration("euterpe").get<string>("claudePath") || "";
-        const claude = await resolveClaude(setting, bundledClaude(), process.env, log);
+        resolveConfigDir(cfg.get<string>("claudeConfigDir") || "");   // (the session would refuse one that isn't there)
+        const claude = await resolveClaude(cfg.get<string>("claudePath") || "", bundledClaude(), process.env, log);
         log(`claude: ${claude.path} (${claude.version}, from ${claude.source})`);
         return claude;
     } catch (err) {
-        const message = (err as Error).message;
-        log(message);
-        const install = /isn't installed/.test(message) ? ["Install Claude Code"] : [];
-        void vscode.window.showErrorMessage(message, ...install).then((pick) => {
-            if (pick) { void vscode.env.openExternal(vscode.Uri.parse("https://code.claude.com/docs/en/setup")); }
-        });
+        showSettings((err as Error).message, "provider");
         return null;
     }
 }
@@ -652,58 +686,48 @@ function bundledClaude(): string | null {
 }
 
 /**
- * The Electron build the overlay runs on: one that's already there, or one downloaded now
- * with the writer's go-ahead (once: it's kept across updates). Null if there's none to use.
+ * The Electron the overlay runs on: one that's already there, or once its download is done (begun
+ * in the background when the writer clicked Euterpe or opened its settings; kept across updates).
+ * Its progress shows while something waits for it. Null if there's none to use (and the writer is told why).
  */
 async function obtainElectron(): Promise<string | null> {
-    try {
-        const found = findElectron({
-            override: vscode.workspace.getConfiguration("euterpe").get<string>("electronPath") || "",
-            extensionRoot: root,
-            storageDir: storage,
-        });
-        if (found) { return found; }
-    } catch (err) {
-        void vscode.window.showErrorMessage((err as Error).message);
+    const now = runtime.status();
+    if (now.kind === "problem") {
+        void vscode.window.showErrorMessage(now.message);
         return null;
     }
-    if (!electronTarget()) {
-        void vscode.window.showErrorMessage(`Euterpe's avatar runs on Electron, which has no build for ${process.platform}-${process.arch}.`);
-        return null;
-    }
-    // Modal: a notification hides itself after a few seconds, and the session would wait unseen.
-    const choice = await vscode.window.showInformationMessage(
-        "Euterpe's avatar lives in a little window of its own, which runs on Electron. Download it now? (About 150 MB, once.)",
-        { modal: true }, "Download");
-    return choice === "Download" ? downloadElectronWithProgress() : null;
-}
-
-/** Download the avatar runtime (the writer said yes), with progress; null if it failed or was cancelled. */
-function downloadElectronWithProgress(): Thenable<string | null> {
-    return vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Downloading Euterpe's avatar runtime", cancellable: true },
+    if (now.kind === "ready") { return runtime.obtain(); }
+    const exe = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "Getting Euterpe's avatar ready", cancellable: true },
         async (progress, token) => {
+            token.onCancellationRequested(() => runtime.cancel());
             let shown = 0;
-            try {
-                return await downloadElectron(storage, {
-                    log,
-                    cancellation: token,
-                    progress: (received, total) => {
-                        const pct = total ? Math.floor((received / total) * 100) : 0;
-                        if (total && pct > shown) {
-                            progress.report({ increment: pct - shown, message: `${mb(received)} of ${mb(total)} MB` });
-                            shown = pct;
-                        }
-                    },
-                });
-            } catch (err) {
-                log(`electron download failed: ${(err as Error).message}`);
-                if (!token.isCancellationRequested) {
-                    void vscode.window.showErrorMessage(`${(err as Error).message} (Or point euterpe.electronPath at an Electron you already have.)`);
+            const report = () => {
+                const s = runtime.status();
+                if (s.kind === "downloading" && s.total) {
+                    const pct = Math.floor((s.received / s.total) * 100);
+                    if (pct > shown) {
+                        progress.report({ increment: pct - shown, message: `Electron, once: ${mb(s.received)} of ${mb(s.total)} MB` });
+                        shown = pct;
+                    }
+                } else if (s.kind === "unpacking") {
+                    progress.report({ message: "unpacking Electron…" });
                 }
-                return null;
+            };
+            const sub = runtime.onChange(report);
+            try {
+                const done = runtime.obtain();
+                report();
+                return await done;
+            } finally {
+                sub.dispose();
             }
         });
+    const after = runtime.status();
+    if (!exe && after.kind === "failed") {
+        void vscode.window.showErrorMessage(`${after.message} (Or point euterpe.electronPath at an Electron you already have.)`);
+    }
+    return exe;
 }
 
 const mb = (bytes: number) => Math.round(bytes / 1_048_576);

@@ -21,11 +21,10 @@ For the others, switch *Mind* in **Euterpe: Open Settings**: to **OpenAI & other
 
 Then:
 
-1. Open the document you're writing: Markdown, plain text, anything.
-2. Click **Euterpe** in the status bar (or run **Euterpe: Start Writing Session**).
-3. The first time, Euterpe offers to download its avatar's window runtime (Electron, about 150 MB, once).
+1. Click **Euterpe** in the status bar (or run **Euterpe: Start Writing Session**). If something's missing (Claude Code, a sign-in, a key), Euterpe opens its settings where that's shown instead.
+2. The first time, Euterpe offers to download its avatar's window runtime (Electron, about 150 MB, once).
 
-Euterpe walks onto your screen, reads its memory and your draft, then says hello. **Euterpe: Check Setup** checks everything a session needs, without starting one.
+Euterpe walks onto your screen, reads its memory and the document you're on (Markdown, plain text, anything), then says hello. With no document open yet, it reads the first one you open. **Euterpe: Check Setup** checks everything a session needs, without starting one.
 
 ## Writing together
 

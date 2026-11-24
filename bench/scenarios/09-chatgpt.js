@@ -2,7 +2,7 @@
 "use strict";
 
 const fs = require("fs");
-const { HELLO, startSession, chat } = require("./lib");
+const { HELLO, startSession, settingsInstead, chat } = require("./lib");
 
 const ACCOUNT = { clientId: "app_euterpe_7Hk2Lm9Q", subject: "user-8Qm2fK", email: "writer@example.com" };
 const SCOPES = ["openid", "profile", "email", "offline_access", "resource.invoke", "chatgpt.tokens.use.direct"];
@@ -35,17 +35,17 @@ module.exports = {
             summary: "A writer who chose OpenAI and others, with the plan (the default), starts their first session: the sign-in, the session.",
             world: () => ({ provider: "openai" }),
             async run(t) {
-                const first = t.mind.turn({ kind: "session_start" });
-                t.run("euterpe.startSession");
-                const ask = await t.modal({ text: /continue with ChatGPT first/ });
-                await t.screen("sign-in-first", "Continue with ChatGPT first", "");
-                ask.click("Continue with ChatGPT");
+                await settingsInstead(t, { selector: '[data-run="signIn"]' });
+                await t.screen("sign-in-first", "Continue with ChatGPT first", "Not signed in yet: Euterpe's settings open at the choice of mind, where the sign-in is.");
+                await t.webview.do("click", '[data-run="signIn"]');
                 const { answer } = await signInPage(t);
                 await t.progress({ title: /continue with ChatGPT/ });
                 await t.screen("waiting", "Waiting for the sign-in", "The browser opens OpenAI's sign-in page (the bench's stand-in: pick how it goes), and VS Code waits, with a way to cancel.");
                 answer();
                 await t.wait(1500);
                 await t.screen("signed-in", "Signed in", "The page Euterpe's own sign-in server shows once the browser comes back.");
+                const first = t.mind.turn({ kind: "session_start" });
+                t.run("euterpe.startSession");
                 const turn = await first;
                 await t.overlay.ready();
                 const answered = t.session.response();
@@ -120,11 +120,8 @@ module.exports = {
                 for (const [mode, key, title] of [["reused", "reused", "Its renewal was used elsewhere"], ["expired", "expired", "It expired"], ["client", "client", "Its registration is gone"]]) {
                     t.world.spec.chatgpt = { refresh: mode };
                     await t.secret(LOGIN, soon());
-                    t.run("euterpe.startSession");
-                    const m = await t.modal({ text: /has ended/ });
-                    await t.screen(key, title, "Renewing the sign-in as the session starts, OpenAI refuses: the session asks for a new one.");
-                    m.close();
-                    await t.wait(600);
+                    await settingsInstead(t, { selector: '[data-run="signIn"]' });
+                    await t.screen(key, title, "Renewing the sign-in as the session starts, OpenAI refuses: Euterpe's settings open where the sign-in is, saying why it ended.");
                 }
                 t.world.spec.chatgpt = { refresh: "down" };
                 await t.secret(LOGIN, soon());
@@ -237,14 +234,12 @@ module.exports = {
             summary: "The plan offers Euterpe no models; then the plan's models can't be listed.",
             world: plan({ chatgpt: { models: [] } }),
             async run(t) {
-                t.run("euterpe.startSession");
-                const n = await t.notification({ text: /offers Euterpe no models/ });
-                await t.screen("none", "No models", "With a way to Euterpe's settings.");
-                n.close();
+                await settingsInstead(t);
+                await t.screen("none", "No models", "Euterpe's settings open at the model, which says so.");
                 t.world.spec.chatgpt = { models: { status: 500, body: { detail: "Internal server error" } } };
                 t.run("euterpe.startSession");
                 await t.notification({ text: /didn't list your plan's models/ });
-                await t.screen("unlisted", "The models can't be listed", "Without a model chosen, Euterpe can't pick one.");
+                await t.screen("unlisted", "The models can't be listed", "Without a model chosen, Euterpe can't pick one. Nothing's badly set (OpenAI didn't answer): an error, not the settings.");
             },
         },
         {
@@ -316,9 +311,8 @@ module.exports = {
                 secrets: { [LOGIN]: JSON.stringify({ ...ACCOUNT, ended: "Euterpe's ChatGPT sign-in has ended: OpenAI didn't renew it, and asks you to log in again.", freshLogin: true, at: Date.now() - 86400_000 }) },
             }),
             async run(t) {
-                t.run("euterpe.startSession");
-                await t.modal({ text: /has ended/ });
-                await t.screen("ask", "The sign-in has ended", "Why, then how to go on.");
+                await settingsInstead(t, { selector: '[data-run="signIn"]' });
+                await t.screen("ask", "The sign-in has ended", "Euterpe's settings open where the sign-in is: why it ended, then how to go on.");
             },
         },
         {
