@@ -51,9 +51,31 @@ module.exports = {
                 setup.click("Continue with GitHub");
                 await t.wait(1500);
                 await t.webview.do("top");
-                await t.screen("signed-in", "Signed in", "As soon as VS Code has Copilot's models, with the GitHub account when VS Code has just one.");
+                await t.screen("signed-in", "Signed in", "As soon as VS Code has Copilot's models, with the GitHub account when VS Code has just one. The account is VS Code's: the link leads to its accounts.");
                 await t.webview.do("scroll", "#mind");
                 await t.screen("models", "Copilot's models", "By Copilot's names; Euterpe's pick is Auto, where Copilot chooses the model. Effort, as on the other minds, with what happens when a model doesn't take it.");
+            },
+        },
+        {
+            id: "copilot-sign-out",
+            title: "Signing out of GitHub Copilot",
+            summary: "Euterpe has no sign-in of its own on Copilot: Manage accounts, in the settings window, leads to VS Code's accounts, where the writer signs out.",
+            world: copilot(),
+            async run(t) {
+                await open(t);
+                await t.webview.do("top");
+                await t.webview.do("click", '[data-run="manageAccounts"]');
+                const accounts = await t.quickPick({ text: /Select an account to manage/ });
+                await t.screen("accounts", "VS Code's accounts", "VS Code's own Manage Accounts (the bench's stand-in for it).");
+                accounts.pick(0);
+                const actions = await t.quickPick({ text: /Select an action/ });
+                actions.pick("Sign Out");
+                const sure = await t.modal({ text: /Sign out from these extensions/ });
+                sure.click("Sign Out");
+                await t.webview.do("wait", '[data-run="setUpCopilot"]');
+                await t.wait(400);
+                await t.webview.do("top");
+                await t.screen("signed-out", "Signed out", "Copilot offers no models anymore: the way back to its sign-in.");
             },
         },
         {

@@ -339,7 +339,7 @@
             </div>`}`;
     }
 
-    /** GitHub Copilot, as VS Code has it: its models, or the way to its sign-in. */
+    /** GitHub Copilot, as VS Code has it: its models, or the way to its sign-in. The account is VS Code's: signing out is there. */
     function copilotField() {
         const problem = state.copilot && state.copilot.problem;
         const account = state.copilot && state.copilot.account;
@@ -347,7 +347,8 @@
                 <div class="field-label">GitHub Copilot</div>
                 ${problem ? h`<p class="key-line"><span class="key-dot key-missing" aria-hidden="true"></span>${problem}
                     <button class="btn" data-run="setUpCopilot">Set Up Copilot…</button></p>`
-                    : h`<p class="key-line"><span class="key-dot key-set" aria-hidden="true"></span><span>Signed in${account ? h` as <strong>${account}</strong>` : ""}.</span></p>`}
+                    : h`<p class="key-line"><span class="key-dot key-set" aria-hidden="true"></span><span>Signed in${account ? h` as <strong>${account}</strong>` : ""}, in VS Code.</span>
+                        <button class="link" data-run="manageAccounts">Manage accounts</button></p>`}
             </div>`;
     }
 

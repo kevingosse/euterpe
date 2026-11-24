@@ -876,6 +876,7 @@ function createVscode(bench) {
         "workbench.action.reloadWindow": () => bench.reload(),
         "workbench.action.openWalkthrough": () => { },
         "workbench.action.chat.triggerSetup": () => copilotSetup(),
+        "workbench.action.manageAccounts": () => manageAccounts(),
         "revealFileInOS": (uri) => ui.post({ type: "external", url: uriOf(uri).toString(), site: bench.site() }),
     };
     api.commands = {
@@ -1025,6 +1026,35 @@ function createVscode(bench) {
                 resolve();
             });
         });
+    }
+
+    /**
+     * VS Code's Manage Accounts (the bench's stand-in for it): the GitHub account Copilot uses, and
+     * signing out of it, which takes Copilot's models away.
+     */
+    async function manageAccounts() {
+        const site = bench.site();
+        const pick = (spec) => new Promise((resolve) => {
+            const w = ui.widget({ widget: "quickpick", vscode: "accounts", site, ...spec });
+            w.on("accept", (e) => { w.close(); resolve(e?.index ?? null); });
+            w.on("hide", () => { w.close(); resolve(null); });
+        });
+        const accounts = await api.authentication.getAccounts("github");
+        if (!accounts.length) { await pick({ placeholder: "Select an account to manage", items: [{ label: "There are no active accounts." }] }); return; }
+        const which = await pick({ placeholder: "Select an account to manage", items: accounts.map((a) => ({ label: a.label, description: "GitHub" })) });
+        const account = accounts[which];
+        if (!account) { return; }
+        const action = await pick({ title: `Manage '${account.label}'`, placeholder: "Select an action", items: [{ label: "Manage Trusted Extensions" }, { label: "Sign Out" }] });
+        if (action !== 1) { return; }
+        const sure = await new Promise((resolve) => {
+            const w = ui.widget({
+                widget: "message", modal: true, vscode: "sign-out", severity: "warning",
+                message: `The account '${account.label}' has been used by: \n\n${COPILOT_PROVIDER}\n\n Sign out from these extensions?`,
+                items: [{ title: "Sign Out" }, { title: "Cancel", isCloseAffordance: true }], site,
+            });
+            w.on("answer", (e) => { w.close(); resolve(!!e && e.index === 0); });
+        });
+        if (sure) { setCopilot({ models: [] }); }
     }
 
     api.lm = {

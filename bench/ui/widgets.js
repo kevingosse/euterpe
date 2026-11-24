@@ -162,7 +162,8 @@ function openQuickPick(w) {
     const s = w.spec;
     w.value = s.value || "";
     w.activeIndex = s.active?.[0] ?? s.items.findIndex((i) => i.kind !== -1);
-    w.node = el("div", { class: "qi", "data-surface": "quickpick", data: { widget: w.id, site: src(s) } });
+    // (VS Code's own quick pick, as its own dialogs: not Euterpe's words)
+    w.node = el("div", { class: "qi", "data-surface": s.vscode ? `vscode-quickpick:${s.vscode}` : "quickpick", data: { widget: w.id, site: src(s) }, ...(s.vscode ? { "data-vscode": "1" } : {}) });
     layer()?.append(w.node);
     renderQuickPick(w, true);
 }

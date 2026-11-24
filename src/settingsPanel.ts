@@ -64,6 +64,18 @@ async function githubAccount(): Promise<string | undefined> {
     }
 }
 
+/**
+ * VS Code's accounts, where the writer signs out of the GitHub account Copilot uses (Euterpe has no
+ * sign-in of its own there). An older VS Code has no Manage Accounts: its Accounts commands, then.
+ */
+async function manageAccounts(): Promise<void> {
+    try {
+        await vscode.commands.executeCommand("workbench.action.manageAccounts");
+    } catch {
+        await vscode.commands.executeCommand("workbench.action.quickOpen", ">Accounts: ");
+    }
+}
+
 /** How long the window trusts the plan's models it listed. */
 const PLAN_MODELS_TTL_MS = 10 * 60_000;
 
@@ -256,6 +268,7 @@ export class SettingsPanel implements vscode.Disposable {
             case "signOut": await host.signOut(); this.plan = undefined; break;
             case "listModels": void this.listModels(); break;
             case "setUpCopilot": await host.setUpCopilot(); break;
+            case "manageAccounts": await manageAccounts(); break;
             case "startSession": await host.startSession(); break;
         }
     }
