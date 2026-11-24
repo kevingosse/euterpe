@@ -2,7 +2,7 @@
   "name": "euterpe",
   "displayName": "Euterpe",
   "description": "An AI pair-writing companion — a presence beside you while you write.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "kevingosse",
   "private": true,
   "license": "MIT",
