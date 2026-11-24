@@ -25,6 +25,7 @@ After pulling changes, run `npm install && npm run compile`, then reload the win
 - `npm test` compiles and runs the unit tests with Node's built-in runner; no VS Code needed.
   - The tests that draw with Electron (mascot sheets) run once the development Electron is fetched (`npm run demo` fetches it), and skip before that.
 - `npm run package` builds the `.vsix`.
+- `npm version patch`, then `git push --follow-tags`, makes a release: once CI passes on the tag, the `.vsix` is on the repo's Releases page.
 - CI (`.github/workflows/ci.yml`) runs on Windows, macOS and Linux. It runs the tests and packages the extension, renders the overlay, and draws the mascots. On macOS it also checks the window's focus handling on the Electron that Euterpe downloads (`overlay/dev/check-focus.js`).
 - In VS Code:
   - **Euterpe: Check Setup** checks a session's requirements;

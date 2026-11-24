@@ -52,3 +52,30 @@ jobs:
         with:
           name: vsix
           path: "*.vsix"
+
+  # A version tag (`npm version patch`, then `git push --follow-tags`) puts the .vsix that passed on
+  # all three platforms on the repo's Releases page.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: vsix
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          vsix="euterpe-${tag#v}.vsix"
+          if [ ! -f "$vsix" ]; then
+            echo "::error::The tag $tag doesn't match package.json's version (the build made $(ls *.vsix))."
+            exit 1
+          fi
+          gh release create "$tag" "$vsix" --verify-tag --title "Euterpe ${tag#v}" --generate-notes \
+            --notes "To install: in VS Code's Extensions view, **⋯** → **Install from VSIX…**, then pick \`$vsix\`."
